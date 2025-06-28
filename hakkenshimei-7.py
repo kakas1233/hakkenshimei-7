@@ -186,52 +186,64 @@ def run_app():
         st.session_state[tab + "_mp3"] = mp3
 
     if (tab + "_pool" in st.session_state) and (tab + "_names" in st.session_state):
-        pool = st.session_state[tab + "_pool"]
-        used = st.session_state[tab + "_used"]
-        names = st.session_state[tab + "_names"]
-        pc, uc = Counter(pool), Counter(used)
+    pool = st.session_state[tab + "_pool"]
+    used = st.session_state[tab + "_used"]
+    names = st.session_state[tab + "_names"]
+    pc = Counter(pool)
+    uc = Counter(used)
 
-        absent_input = st.text_area("⛔ 欠席者（1回の指名ごとに設定）", height=80, key=tab + "absent")
-        absents = [x.strip() for x in absent_input.split("\n") if x.strip()]
-        available = [i for i, name in enumerate(names) if name not in absents]
+    absent_input = st.text_area("⛔ 欠席者（1回の指名ごとに設定）", height=80, key=tab + "absent")
+    absents = [x.strip() for x in absent_input.split("\n") if x.strip()]
+    available = [i for i, name in enumerate(names) if name not in absents]
 
-        if st.button("🎯 指名！", key=tab + "pick"):
-            rem = [i for i in (pc - uc).elements() if i in available]
-            if rem:
-                sel = random.choice(rem)
-                st.session_state[tab + "_used"].append(sel)
-                st.markdown(
-                    f"<div style='font-size:64px;text-align:center;color:#4CAF50;margin:30px;'>🎉 {sel+1} : {names[sel]} 🎉</div>",
-                    unsafe_allow_html=True
-                )
-                if tab + "_mp3" in st.session_state and st.session_state.sound_on:
-                    play_audio_if_needed(st.session_state[tab + "_mp3"])
-            else:
-                st.warning("✅ 全回数分の指名が完了しました！")
+    debug = st.checkbox("🔍 デバッグ表示", key=tab + "_debug", value=False)
+    if debug:
+        st.write("📦 Pool（各番号の出現回数）:", pc)
+        st.write("📉 Used（各番号の指名回数）:", uc)
+        st.write("✅ Available（出席している人）:", available)
 
-        used = st.session_state[tab + "_used"]
-        df = pd.DataFrame([
-            (i+1, names[i], st.session_state.sound_on, st.session_state.auto_save, tab, k, l, n)
-            for i in used
-        ], columns=["番号", "名前", "音ON", "自動保存ON", "クラス名", "k", "l", "n"])
+    if st.button("🎯 指名！", key=tab + "pick"):
+        # 使用可能な番号 = 出席していて、まだ指名枠が残っている人
+        rem = []
+        for i in available:
+            remaining = pc[i] - uc[i]
+            rem.extend([i] * remaining)
 
-        csv = io.StringIO(); df.to_csv(csv, index=False)
-        timestamp = datetime.now(JST).strftime("%Y-%m-%d_%H-%M")
-        filename = f"{tab}_{timestamp}_history.csv"
-        st.download_button("⬇️ 指名履歴のダウンロード", csv.getvalue(), file_name=filename)
+        if rem:
+            sel = random.choice(rem)
+            st.session_state[tab + "_used"].append(sel)
+            st.markdown(
+                f"<div style='font-size:64px;text-align:center;color:#4CAF50;margin:30px;'>🎉 {sel+1} : {names[sel]} 🎉</div>",
+                unsafe_allow_html=True
+            )
+            if tab + "_mp3" in st.session_state and st.session_state.sound_on:
+                play_audio_if_needed(st.session_state[tab + "_mp3"])
+        else:
+            st.warning("✅ 出席者の中で指名可能な人がいません。欠席設定や指名回数を確認してください。")
 
-        if st.session_state.auto_save:
-            latest_path = f"history/{tab}_最新.csv"
-            with open(latest_path, "w", encoding="utf-8") as f:
-                f.write(csv.getvalue())
+    # 履歴と保存
+    used = st.session_state[tab + "_used"]
+    df = pd.DataFrame([
+        (i+1, names[i], st.session_state.sound_on, st.session_state.auto_save, tab, k, l, n)
+        for i in used
+    ], columns=["番号", "名前", "音ON", "自動保存ON", "クラス名", "k", "l", "n"])
 
-        rem = len([i for i in (pc - Counter(used)).elements() if i in available])
-        st.write(f"📌 残り指名可能人数: {rem} / {len(pool)}")
+    csv = io.StringIO(); df.to_csv(csv, index=False)
+    timestamp = datetime.now(JST).strftime("%Y-%m-%d_%H-%M")
+    filename = f"{tab}_{timestamp}_history.csv"
+    st.download_button("⬇️ 指名履歴のダウンロード", csv.getvalue(), file_name=filename)
 
-        if used:
-            st.write("📋 指名済み:")
-            st.write(df)
+    if st.session_state.auto_save:
+        latest_path = f"history/{tab}_最新.csv"
+        with open(latest_path, "w", encoding="utf-8") as f:
+            f.write(csv.getvalue())
 
-if __name__ == "__main__":
-    run_app()
+    # 残り人数カウントの表示
+    remaining = 0
+    for i in available:
+        remaining += max(pc[i] - uc[i], 0)
+    st.write(f"📌 残り指名可能人数: {remaining} / {len(pool)}")
 
+    if used:
+        st.write("📋 指名済み:")
+        st.write(df)
