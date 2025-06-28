@@ -203,14 +203,7 @@ def run_app():
         available = [i for i, name in enumerate(names) if name not in absents]
 
         if st.button("🎯 指名！", key=tab + "pick"):
-            rem = [i for i in (pc - uc).elements() if i in available]
-            # 🔍 デバッグ出力（指名候補と内部状態）
-            st.write("デバッグ用出力👇")
-            st.write("候補者 rem:", rem)
-            st.write("全体プール pc:", pc)
-            st.write("使用済み uc:", uc)
-            st.write("出席者 available:", available)
-
+            rem = list((pc-uc).elements())
             if rem:
                 sel = random.choice(rem)
                 st.session_state[tab + "_used"].append(sel)
