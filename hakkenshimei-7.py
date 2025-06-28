@@ -8,13 +8,9 @@ from datetime import datetime, timedelta, timezone
 import os
 import base64
 
-# --- 日本時間設定 ---
 JST = timezone(timedelta(hours=9))
-
-# --- 履歴フォルダ準備 ---
 os.makedirs("history", exist_ok=True)
 
-# --- 乱数生成アルゴリズム定義 ---
 class Xorshift:
     def __init__(self, seed):
         self.state = seed if seed != 0 else 1
@@ -79,7 +75,6 @@ def find_best_seed_and_method(k, l, n):
                 best = (var, method, seed, modded)
     return best[1], best[2], best[0], best[3]
 
-# --- 音再生関数（autoplay） ---
 def play_audio_if_needed(mp3_file):
     if mp3_file:
         audio_bytes = mp3_file.read()
@@ -96,7 +91,6 @@ def run_app():
 
     if "class_list" not in st.session_state:
         st.session_state.class_list = ["クラスA", "クラスB", "クラスC"]
-
     if "auto_save" not in st.session_state:
         st.session_state.auto_save = True
     if "sound_on" not in st.session_state:
@@ -137,7 +131,6 @@ def run_app():
                 st.session_state[tab + "k"] = int(df["k"].iloc[0])
                 st.session_state[tab + "l"] = int(df["l"].iloc[0])
                 st.session_state[tab + "n"] = int(df["n"].iloc[0])
-
                 method, seed, var, pool = find_best_seed_and_method(
                     st.session_state[tab + "k"],
                     st.session_state[tab + "l"],
@@ -203,7 +196,7 @@ def run_app():
         available = [i for i, name in enumerate(names) if name not in absents]
 
         if st.button("🎯 指名！", key=tab + "pick"):
-            rem = list((pc-uc).elements())
+            rem = [i for i in (pc - uc).elements() if i in available]
             if rem:
                 sel = random.choice(rem)
                 st.session_state[tab + "_used"].append(sel)
@@ -232,7 +225,7 @@ def run_app():
             with open(latest_path, "w", encoding="utf-8") as f:
                 f.write(csv.getvalue())
 
-        rem = len(list((pc - Counter(used)).elements()))
+        rem = len([i for i in (pc - Counter(used)).elements() if i in available])
         st.write(f"📌 残り指名可能人数: {rem} / {len(pool)}")
 
         if used:
@@ -241,6 +234,4 @@ def run_app():
 
 if __name__ == "__main__":
     run_app()
-
-
 
