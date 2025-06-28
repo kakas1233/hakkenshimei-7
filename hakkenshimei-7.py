@@ -146,7 +146,7 @@ def run_app():
     l = st.number_input("授業1回あたりの平均指名人数", value=st.session_state.get(tab + "l", 5), min_value=1, key=tab + "l")
     n = st.number_input("クラス人数", value=st.session_state.get(tab + "n", 40), min_value=1, key=tab + "n")
 
-    name_input = st.text_area("名前を改行区切りで入力（足りない分は自動補完します）", height=120, key=tab + "names")
+    name_input = st.text_area("名前を改行区切りで入力（足りない分は自動補完します）", height=120, key=tab + "_name_input")
     raw = [x.strip() for x in name_input.split("\n") if x.strip()]
     if len(raw) < n:
         raw += [f"名前{i+1}" for i in range(len(raw), n)]
@@ -191,7 +191,7 @@ def run_app():
         pc = Counter(pool)
         uc = Counter(used)
 
-        absent_input = st.text_area("⛔ 欠席者（1回の指名ごとに設定）", height=80, key=tab + "absent")
+        absent_input = st.text_area("⛔ 欠席者（1回の指名ごとに設定）", height=80, key=tab + "_absent_input")
         absents = [x.strip() for x in absent_input.split("\n") if x.strip()]
         available = [i for i, name in enumerate(names) if name not in absents]
 
@@ -202,7 +202,6 @@ def run_app():
             st.write("✅ Available（出席している人）:", available)
 
         if st.button("🎯 指名！", key=tab + "pick"):
-            # 使用可能な番号 = 出席していて、まだ指名枠が残っている人
             rem = []
             for i in available:
                 remaining = pc[i] - uc[i]
@@ -220,7 +219,6 @@ def run_app():
             else:
                 st.warning("✅ 出席者の中で指名可能な人がいません。欠席設定や指名回数を確認してください。")
 
-    # 履歴と保存
     used = st.session_state[tab + "_used"]
     df = pd.DataFrame([
         (i+1, names[i], st.session_state.sound_on, st.session_state.auto_save, tab, k, l, n)
@@ -237,7 +235,6 @@ def run_app():
         with open(latest_path, "w", encoding="utf-8") as f:
             f.write(csv.getvalue())
 
-    # 残り人数カウントの表示
     remaining = 0
     for i in available:
         remaining += max(pc[i] - uc[i], 0)
@@ -246,3 +243,6 @@ def run_app():
     if used:
         st.write("📋 指名済み:")
         st.write(df)
+
+if __name__ == "__main__":
+    run_app()
