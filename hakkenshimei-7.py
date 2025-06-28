@@ -203,7 +203,7 @@ def run_app():
             st.error("⚠️ 欠席者の設定により、指名可能な生徒がいません。")
 
         if st.button("🎯 指名！", key=tab + "pick"):
-            rem = [i for i in (pc - uc).elements() if i in available]
+            rem = [i for i in (pc - uc).elements() if i in available and i < len(names)]
             if rem:
                 sel = random.choice(rem)
                 st.session_state[tab + "_used"].append(sel)
