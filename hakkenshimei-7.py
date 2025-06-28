@@ -184,7 +184,6 @@ def run_app():
     mp3 = st.file_uploader("🎵 指名時に再生したいMP3ファイルをアップロード", type="mp3", key=tab + "_mp3_uploader")
     if mp3:
         st.session_state[tab + "_mp3"] = mp3
-
     if (tab + "_pool" in st.session_state) and (tab + "_names" in st.session_state):
     pool = st.session_state[tab + "_pool"]
     used = st.session_state[tab + "_used"]
