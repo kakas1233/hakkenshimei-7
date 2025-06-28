@@ -146,7 +146,7 @@ def run_app():
     l = st.number_input("授業1回あたりの平均指名人数", value=st.session_state.get(tab + "l", 5), min_value=1, key=tab + "l")
     n = st.number_input("クラス人数", value=st.session_state.get(tab + "n", 40), min_value=1, key=tab + "n")
 
-    name_input = st.text_area("名前を改行区切りで入力（足りない分は自動補完します）", height=120, key=tab + "_name_input")
+    name_input = st.text_area("名前を改行区切りで入力（足りない分は自動補完します）", height=120, key=tab + "names")
     raw = [x.strip() for x in name_input.split("\n") if x.strip()]
     if len(raw) < n:
         raw += [f"名前{i+1}" for i in range(len(raw), n)]
@@ -191,7 +191,7 @@ def run_app():
         pc = Counter(pool)
         uc = Counter(used)
 
-        absent_input = st.text_area("⛔ 欠席者（1回の指名ごとに設定）", height=80, key=tab + "_absent_input")
+        absent_input = st.text_area("⛔ 欠席者（1回の指名ごとに設定）", height=80, key=tab + "absent")
         absents = [x.strip() for x in absent_input.split("\n") if x.strip()]
         available = [i for i, name in enumerate(names) if name not in absents]
 
@@ -199,7 +199,8 @@ def run_app():
         if debug:
             st.write("📦 Pool（各番号の出現回数）:", pc)
             st.write("📉 Used（各番号の指名回数）:", uc)
-            st.write("✅ Available（出席している人）:", available)
+            st.write("✅ Available（出席している人の番号）:", available)
+            st.write("🧍 出席者の名前:", [names[i] for i in available])
 
         if st.button("🎯 指名！", key=tab + "pick"):
             rem = []
@@ -244,5 +245,6 @@ def run_app():
         st.write("📋 指名済み:")
         st.write(df)
 
+# 実行
 if __name__ == "__main__":
     run_app()
