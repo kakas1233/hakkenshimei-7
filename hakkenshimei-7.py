@@ -196,29 +196,29 @@ def run_app():
         available = [i for i, name in enumerate(names) if name not in absents]
 
         debug = st.checkbox("🔍 デバッグ表示", key=tab + "_debug", value=False)
-    if debug:
-        st.write("📦 Pool（各番号の出現回数）:", pc)
-        st.write("📉 Used（各番号の指名回数）:", uc)
-        st.write("✅ Available（出席している人）:", available)
+        if debug:
+            st.write("📦 Pool（各番号の出現回数）:", pc)
+            st.write("📉 Used（各番号の指名回数）:", uc)
+            st.write("✅ Available（出席している人）:", available)
 
-    if st.button("🎯 指名！", key=tab + "pick"):
-        # 使用可能な番号 = 出席していて、まだ指名枠が残っている人
-        rem = []
-        for i in available:
-            remaining = pc[i] - uc[i]
-            rem.extend([i] * remaining)
+        if st.button("🎯 指名！", key=tab + "pick"):
+            # 使用可能な番号 = 出席していて、まだ指名枠が残っている人
+            rem = []
+            for i in available:
+                remaining = pc[i] - uc[i]
+                rem.extend([i] * remaining)
 
-        if rem:
-            sel = random.choice(rem)
-            st.session_state[tab + "_used"].append(sel)
-            st.markdown(
-                f"<div style='font-size:64px;text-align:center;color:#4CAF50;margin:30px;'>🎉 {sel+1} : {names[sel]} 🎉</div>",
-                unsafe_allow_html=True
-            )
-            if tab + "_mp3" in st.session_state and st.session_state.sound_on:
-                play_audio_if_needed(st.session_state[tab + "_mp3"])
-        else:
-            st.warning("✅ 出席者の中で指名可能な人がいません。欠席設定や指名回数を確認してください。")
+            if rem:
+                sel = random.choice(rem)
+                st.session_state[tab + "_used"].append(sel)
+                st.markdown(
+                    f"<div style='font-size:64px;text-align:center;color:#4CAF50;margin:30px;'>🎉 {sel+1} : {names[sel]} 🎉</div>",
+                    unsafe_allow_html=True
+                )
+                if tab + "_mp3" in st.session_state and st.session_state.sound_on:
+                    play_audio_if_needed(st.session_state[tab + "_mp3"])
+            else:
+                st.warning("✅ 出席者の中で指名可能な人がいません。欠席設定や指名回数を確認してください。")
 
     # 履歴と保存
     used = st.session_state[tab + "_used"]
