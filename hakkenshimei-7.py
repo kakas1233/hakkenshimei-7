@@ -185,17 +185,17 @@ def run_app():
     if mp3:
         st.session_state[tab + "_mp3"] = mp3
     if (tab + "_pool" in st.session_state) and (tab + "_names" in st.session_state):
-    pool = st.session_state[tab + "_pool"]
-    used = st.session_state[tab + "_used"]
-    names = st.session_state[tab + "_names"]
-    pc = Counter(pool)
-    uc = Counter(used)
+        pool = st.session_state[tab + "_pool"]
+        used = st.session_state[tab + "_used"]
+        names = st.session_state[tab + "_names"]
+        pc = Counter(pool)
+        uc = Counter(used)
 
-    absent_input = st.text_area("⛔ 欠席者（1回の指名ごとに設定）", height=80, key=tab + "absent")
-    absents = [x.strip() for x in absent_input.split("\n") if x.strip()]
-    available = [i for i, name in enumerate(names) if name not in absents]
+        absent_input = st.text_area("⛔ 欠席者（1回の指名ごとに設定）", height=80, key=tab + "absent")
+        absents = [x.strip() for x in absent_input.split("\n") if x.strip()]
+        available = [i for i, name in enumerate(names) if name not in absents]
 
-    debug = st.checkbox("🔍 デバッグ表示", key=tab + "_debug", value=False)
+        debug = st.checkbox("🔍 デバッグ表示", key=tab + "_debug", value=False)
     if debug:
         st.write("📦 Pool（各番号の出現回数）:", pc)
         st.write("📉 Used（各番号の指名回数）:", uc)
