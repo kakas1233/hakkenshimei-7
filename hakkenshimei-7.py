@@ -1,93 +1,43 @@
 import streamlit as st
-from collections import Counter
-import random
-import math
-import io
 import pandas as pd
-from datetime import datetime, timedelta, timezone
+import random
+import io
 import os
-import base64
+import math
+from collections import Counter
+from datetime import datetime, timedelta, timezone
 
-JST = timezone(timedelta(hours=9))
-os.makedirs("history", exist_ok=True)
-
-class Xorshift:
-    def __init__(self, seed):
-        self.state = seed if seed != 0 else 1
-    def next(self):
-        x = self.state
-        x ^= (x << 13) & 0xFFFFFFFF
-        x ^= (x >> 17)
-        x ^= (x << 5) & 0xFFFFFFFF
-        self.state = x & 0xFFFFFFFF
-        return self.state
-    def generate(self, count):
-        return [self.next() for _ in range(count)]
-
-def mersenne_twister(seed, count):
-    random.seed(seed)
-    return [random.randint(0, 100000) for _ in range(count)]
-
-def middle_square(seed, count):
-    n_digits = len(str(seed))
-    value = seed
-    result = []
-    for _ in range(count):
-        squared = value ** 2
-        squared_str = str(squared).zfill(2 * n_digits)
-        start = (len(squared_str) - n_digits) // 2
-        middle_digits = int(squared_str[start:start + n_digits])
-        result.append(middle_digits)
-        value = middle_digits if middle_digits != 0 else seed + 1
-    return result
-
-def lcg(seed, count):
-    m = 2**32; a = 1664525; c = 1013904223
-    result = []; x = seed
-    for _ in range(count):
-        x = (a * x + c) % m
-        result.append(x)
-    return result
-
-def calculate_variance(numbers, n):
-    mod = [x % n for x in numbers]
-    counts = Counter(mod)
-    all_counts = [counts.get(i, 0) for i in range(n)]
-    expected = len(numbers) / n
-    variance = sum((c - expected) ** 2 for c in all_counts) / n
-    return variance, mod
-
-@st.cache_data(show_spinner=False)
-def find_best_seed_and_method(k, l, n):
-    seed_range = range(0, 1000001, 100)
-    count = k * l
-    best = (float('inf'), None, None, None)
-    for method in ["Xorshift", "Mersenne Twister", "Middle Square", "LCG"]:
-        for seed in seed_range:
-            nums = {
-                "Xorshift": Xorshift(seed).generate(count),
-                "Mersenne Twister": mersenne_twister(seed, count),
-                "Middle Square": middle_square(seed, count),
-                "LCG": lcg(seed, count)
-            }[method]
-            var, modded = calculate_variance(nums, n)
-            if var < best[0]:
-                best = (var, method, seed, modded)
-    return best[1], best[2], best[0], best[3]
+JST = timezone(timedelta(hours=+9), 'JST')
 
 def play_audio_if_needed(mp3_file):
-    if mp3_file:
-        audio_bytes = mp3_file.read()
-        b64 = base64.b64encode(audio_bytes).decode()
-        audio_html = f"""
-            <audio autoplay>
-                <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
-            </audio>
-        """
-        st.markdown(audio_html, unsafe_allow_html=True)
+    if mp3_file is not None:
+        st.audio(mp3_file, format='audio/mp3')
+
+def find_best_seed_and_method(k, l, n):
+    total = k * l
+    best_var = float('inf')
+    best_seed = None
+    best_method = ""
+    best_pool = []
+    for seed in range(1000):
+        random.seed(seed)
+        pool = []
+        while len(pool) < total:
+            pool.extend(random.sample(range(n), n))
+        pool = pool[:total]
+        count = Counter(pool)
+        freq = [count[i] for i in range(n)]
+        mean = sum(freq) / n
+        var = sum((x - mean) ** 2 for x in freq) / n
+        if var < best_var:
+            best_var = var
+            best_seed = seed
+            best_method = "random.sample + extend"
+            best_pool = pool
+    return best_method, best_seed, best_var, best_pool
 
 def run_app():
-    st.title("🎲 指名アプリ（完全版）")
+    st.title("\U0001F3B2 指名アプリ")
 
     if "class_list" not in st.session_state:
         st.session_state.class_list = ["クラスA", "クラスB", "クラスC"]
@@ -96,8 +46,8 @@ def run_app():
     if "sound_on" not in st.session_state:
         st.session_state.sound_on = False
 
-    with st.sidebar.expander("🔧 設定"):
-        st.session_state.sound_on = st.checkbox("🔊 指名時に音を鳴らす", value=st.session_state.sound_on)
+    with st.sidebar.expander("\U0001F527 設定"):
+        st.session_state.sound_on = st.checkbox("\U0001F50A 指名時に音を鳴らす", value=st.session_state.sound_on)
         st.session_state.auto_save = st.checkbox("💾 自動で履歴を保存する", value=st.session_state.auto_save)
 
     with st.sidebar.expander("⚙️ クラス設定"):
@@ -117,8 +67,8 @@ def run_app():
             st.session_state.class_list.append(new_class)
 
     tab = st.sidebar.selectbox("📚 クラス選択", st.session_state.class_list)
-
     latest_path = f"history/{tab}_最新.csv"
+
     if os.path.exists(latest_path):
         try:
             df = pd.read_csv(latest_path)
@@ -137,7 +87,7 @@ def run_app():
                     st.session_state[tab + "n"]
                 )
                 st.session_state[tab + "_pool"] = pool
-                st.toast("📥 自動で前回の履歴を読み込みました！")
+                st.toast("\U0001F4E5 自動で前回の履歴を読み込みました！")
         except Exception as e:
             st.warning(f"履歴の読み込み中にエラーが発生しました: {e}")
 
@@ -153,12 +103,12 @@ def run_app():
     elif len(raw) > n:
         raw = raw[:n]
     names = raw
-    st.write("👥 メンバー:", [f"{i+1} : {name}" for i, name in enumerate(names)])
+    st.write("\U0001F465 メンバー:", [f"{i+1} : {name}" for i, name in enumerate(names)])
 
     if f"{tab}_used" not in st.session_state:
         st.session_state[tab + "_used"] = []
 
-    if st.button("📊 指名する準備を整える！", key=tab + "gen"):
+    if st.button("\U0001F4CA 指名する準備を整える！", key=tab + "gen"):
         with st.spinner("⚙️ 指名する準備を整えています…"):
             method, seed, var, pool = find_best_seed_and_method(k, l, len(names))
             std = math.sqrt(var)
@@ -167,7 +117,6 @@ def run_app():
             st.session_state[tab + "_pool"] = pool
             st.session_state[tab + "_used"] = []
             st.session_state[tab + "_names"] = names
-
         st.success(f"✅ 使用した式: {method}（seed={seed}, 指名回数の偏り具合={std:.2f}）")
         st.markdown(
             f"""<div style=\"font-size: 28px; font-weight: bold; text-align: center; color: #2196F3; margin-top: 20px;\">
@@ -176,16 +125,16 @@ def run_app():
             unsafe_allow_html=True
         )
 
-    if st.button("🔄 全リセット", key=tab + "reset"):
+    if st.button("\U0001F501 全リセット", key=tab + "reset"):
         for key in [tab + "_pool", tab + "_used", tab + "_names", tab + "_mp3"]:
             st.session_state.pop(key, None)
         st.experimental_rerun()
 
-    mp3 = st.file_uploader("🎵 指名時に再生したいMP3ファイルをアップロード", type="mp3", key=tab + "_mp3_uploader")
+    mp3 = st.file_uploader("\U0001F3B5 指名時に再生したいMP3ファイルをアップロード", type="mp3", key=tab + "_mp3_uploader")
     if mp3:
         st.session_state[tab + "_mp3"] = mp3
 
-    available = []  # ← 修正1：UnboundLocalError対策として初期化
+    available = []
 
     if (tab + "_pool" in st.session_state) and (tab + "_names" in st.session_state):
         pool = st.session_state[tab + "_pool"]
@@ -196,17 +145,17 @@ def run_app():
 
         absent_input = st.text_area("⛔ 欠席者（1回の指名ごとに設定）", height=80, key=tab + "absent")
         absents = [x.strip() for x in absent_input.split("\n") if x.strip()]
-        absents_normalized = set(x.strip() for x in absents)  # ← 修正2：比較厳密化
+        absents_normalized = set(x.strip() for x in absents)
         available = [i for i, name in enumerate(names) if name.strip() not in absents_normalized]
 
-        debug = st.checkbox("🔍 デバッグ表示", key=tab + "_debug", value=False)
+        debug = st.checkbox("\U0001F50D デバッグ表示", key=tab + "_debug", value=False)
         if debug:
-            st.write("📦 Pool（各番号の出現回数）:", pc)
-            st.write("📉 Used（各番号の指名回数）:", uc)
+            st.write("\U0001F4E6 Pool（各番号の出現回数）:", pc)
+            st.write("\U0001F4C9 Used（各番号の指名回数）:", uc)
             st.write("✅ Available（出席している人の番号）:", available)
-            st.write("🧍 出席者の名前:", [names[i] for i in available])
+            st.write("\U0001F9CD 出席者の名前:", [names[i] for i in available])
 
-        if st.button("🎯 指名！", key=tab + "pick"):
+        if st.button("\U0001F3AF 指名！", key=tab + "pick"):
             rem = []
             for i in available:
                 remaining = pc[i] - uc[i]
@@ -216,7 +165,7 @@ def run_app():
                 sel = random.choice(rem)
                 st.session_state[tab + "_used"].append(sel)
                 st.markdown(
-                    f"<div style='font-size:64px;text-align:center;color:#4CAF50;margin:30px;'>🎉 {sel+1} : {names[sel]} 🎉</div>",
+                    f"<div style='font-size:64px;text-align:center;color:#4CAF50;margin:30px;'>\U0001F389 {sel+1} : {names[sel]} \U0001F389</div>",
                     unsafe_allow_html=True
                 )
                 if tab + "_mp3" in st.session_state and st.session_state.sound_on:
@@ -249,6 +198,5 @@ def run_app():
         st.write("📋 指名済み:")
         st.write(df)
 
-# 実行
 if __name__ == "__main__":
     run_app()
