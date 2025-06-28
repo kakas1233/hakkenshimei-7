@@ -194,6 +194,7 @@ def run_app():
         absent_input = st.text_area("⛔ 欠席者（1回の指名ごとに設定）", height=80, key=tab + "absent")
         absents = [x.strip() for x in absent_input.split("\n") if x.strip()]
         available = [i for i, name in enumerate(names) if name not in absents]
+        st.session_state[tab + "_available"] = available
 
         debug = st.checkbox("🔍 デバッグ表示", key=tab + "_debug", value=False)
         if debug:
