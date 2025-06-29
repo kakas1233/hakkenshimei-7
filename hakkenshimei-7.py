@@ -196,7 +196,7 @@ def run_app():
         # 欠席者を読み込んで、空文字などを除去
         absents = [x.strip() for x in absent_input.split("\n") if x.strip()]
         # 有効な指名対象者（欠席者を除外）
-        available = [i for i, name in enumerate(names) if name not in absents]
+        available = [i for i, name in enumerate(names) if name.strip() not in absents]
 
         # ⚠️ 念のための対策をここに追加！
         if not available:
@@ -232,7 +232,7 @@ def run_app():
             with open(latest_path, "w", encoding="utf-8") as f:
                 f.write(csv.getvalue())
 
-        rem = [i for i in (Counter(pc) - Counter(used)).elements() if i in available]
+        rem = [i for i in (pc - Counter(used)).elements() if i in available]
         st.write(f"📌 残り指名可能人数: {len(rem)} / {len(pool)}")
 
         if used:
