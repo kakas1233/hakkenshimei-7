@@ -232,7 +232,7 @@ def run_app():
             with open(latest_path, "w", encoding="utf-8") as f:
                 f.write(csv.getvalue())
 
-        rem = [i for i in (pc - Counter(used)).elements() if i in available]
+        rem = [i for i in (Counter(pc) - Counter(used)).elements() if i in available]
         st.write(f"📌 残り指名可能人数: {len(rem)} / {len(pool)}")
 
         if used:
