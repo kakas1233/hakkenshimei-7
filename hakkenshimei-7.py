@@ -193,14 +193,14 @@ def run_app():
         pc, uc = Counter(pool), Counter(used)
 
         absent_input = st.text_area("⛔ 欠席者（1回の指名ごとに設定）", height=80, key=tab + "absent")
-        # 欠席者を読み込んで、空文字などを除去
-        absents = [x.strip() for x in absent_input.split("\n") if x.strip()]
-        # 有効な指名対象者（欠席者を除外）
-        available = [i for i, name in enumerate(names) if name.strip() not in absents]
+        absents = [x.replace("　", "").strip() for x in absent_input.split("\n") if x.strip()]
+        names = [x.replace("　", "").strip() for x in names]
 
-        # ⚠️ 念のための対策をここに追加！
+        available = [i for i, name in enumerate(names) if name not in absents]
+
         if not available:
             st.error("⚠️ 欠席者の設定により、指名可能な生徒がいません。")
+
 
         if st.button("🎯 指名！", key=tab + "pick"):
             rem = [i for i in (pc - uc).elements() if i in available and i < len(names)]
@@ -241,4 +241,6 @@ def run_app():
 
 if __name__ == "__main__":
     run_app()
+
+
 
