@@ -3,21 +3,18 @@ import random
 import pandas as pd
 from datetime import datetime, timedelta
 import io
+import os
 
-# タイムゾーン設定（日本時間）
 JST = datetime.utcnow() + timedelta(hours=9)
+os.makedirs("history", exist_ok=True)
 
-# アプリ設定
 st.set_page_config(page_title="乱数指名アプリ", layout="wide")
+st.title("🎲 乱数指名アプリ")
 
-# アプリタイトル
-st.title("🎲 指名アプリ")
-
-# --- 乱数生成メソッド ---
+# --- 乱数メソッド定義 ---
 def xor128(seed, k, l, n):
     x, y, z, w = seed, seed << 13, (seed >> 17) ^ seed, seed ^ 0x12345678
-    res = []
-    seen = set()
+    res, seen = [], set()
     while len(res) < n:
         t = x ^ (x << k) & 0xFFFFFFFF
         x, y, z = y, z, w
@@ -30,8 +27,7 @@ def xor128(seed, k, l, n):
 
 def lcg(seed, k, l, n):
     a, c, m = 1103515245, 12345, 2**31
-    res = []
-    seen = set()
+    res, seen = [], set()
     while len(res) < n:
         seed = (a * seed + c) % m
         i = seed % n
@@ -41,8 +37,7 @@ def lcg(seed, k, l, n):
     return res
 
 def mid_square(seed, k, l, n):
-    res = []
-    seen = set()
+    res, seen = [], set()
     while len(res) < n:
         seed = (seed * seed) // 10**k % 10**l
         i = seed % n
@@ -54,8 +49,7 @@ def mid_square(seed, k, l, n):
 
 def mt(seed, k, l, n):
     random.seed(seed)
-    res = []
-    seen = set()
+    res, seen = [], set()
     while len(res) < n:
         i = random.randint(0, n - 1)
         if i not in seen:
@@ -84,13 +78,12 @@ def find_best_seed_and_method(k, l, n, iterations=20):
                 best_order = order
     return best_method, best_seed, best_var, best_order
 
-# --- 音声再生 ---
 def play_audio_if_needed(mp3_file):
     if mp3_file:
         audio_bytes = mp3_file.read()
         st.audio(audio_bytes, format="audio/mp3")
 
-# --- クラス設定と履歴保存 ---
+# --- セッションとUI設定 ---
 if "クラス一覧" not in st.session_state:
     st.session_state["クラス一覧"] = ["A組", "B組"]
 
@@ -98,7 +91,6 @@ st.sidebar.header("⚙️ 設定")
 st.session_state.sound_on = st.sidebar.checkbox("🔊 音を再生する", value=True)
 st.session_state.auto_save = st.sidebar.checkbox("💾 履歴を自動保存する", value=True)
 
-# クラス編集
 with st.sidebar.expander("🏫 クラスを編集する"):
     new_class = st.text_input("➕ クラス追加", "")
     if st.button("追加", key="add_class") and new_class and new_class not in st.session_state["クラス一覧"]:
@@ -107,111 +99,76 @@ with st.sidebar.expander("🏫 クラスを編集する"):
     if st.button("削除", key="remove_class") and remove_class:
         st.session_state["クラス一覧"].remove(remove_class)
 
-# タブ切り替え
 tabs = st.session_state["クラス一覧"]
 tab_objects = st.tabs(tabs)
 
-# 保存先
-latest_path = "最新指名履歴.csv"
+# --- クラスごとの処理 ---
+for i, tab in enumerate(tabs):
+    with tab_objects[i]:
+        st.header(f"🎯 {tab} の指名ボード")
 
-# --- 各クラスごとの処理 ---
-def run_app():
-    for i, tab in enumerate(tabs):
-        with tab_objects[i]:
-            st.header(f"🎯 {tab} の指名ボード")
+        # 各種入力
+        k = st.number_input("年間授業回数", min_value=1, value=30, key=tab + "_k")
+        l = st.number_input("1回の平均指名人数", min_value=1, value=5, key=tab + "_l")
+        n = st.number_input("クラス人数", min_value=1, value=40, key=tab + "_n")
 
-    st.header(f"🎯 {tab} の指名ボード")
-
-    # 名前入力
-    if f"{tab}_names" not in st.session_state:
-        st.session_state[f"{tab}_names"] = []
-    names = st.session_state[f"{tab}_names"]
-
-    num_names = st.number_input("👥 生徒数", min_value=1, max_value=100, value=len(names) or 30, step=1, key=f"{tab}_num")
-    default_names = [f"生徒{i+1}" for i in range(num_names)]
-    for i in range(num_names):
-        name = st.text_input(f"名前 {i+1}", value=names[i] if i < len(names) else default_names[i], key=f"{tab}_name_{i}")
-        if i < len(names):
-            names[i] = name
+        names_raw = st.text_area("👥 名前（改行区切り）", key=tab + "_names_input")
+        names = [x.strip() for x in names_raw.split("\n") if x.strip()]
+        if len(names) < n:
+            names += [f"名前{i+1}" for i in range(len(names), n)]
         else:
-            names.append(name)
-    st.session_state[f"{tab}_names"] = names[:num_names]
+            names = names[:n]
 
-    absentees = st.multiselect("❌ 欠席者を選んでください", names, key=f"{tab}_absent")
+        mp3 = st.file_uploader("📢 MP3ファイル", type="mp3", key=tab + "_mp3")
+        absent_input = st.text_area("❌ 欠席者（改行で複数入力）", key=tab + "_absent")
+        absents = [x.strip() for x in absent_input.split("\n") if x.strip()]
+        available = [i for i, name in enumerate(names) if name not in absents]
 
-    # 履歴管理
-    if f"{tab}_used" not in st.session_state:
-        st.session_state[f"{tab}_used"] = []
+        if st.button("準備する", key=tab + "_prep"):
+            method, seed, var, order = find_best_seed_and_method(k, l, n)
+            st.session_state[tab + "_order"] = order
+            st.session_state[tab + "_used"] = []
+            st.session_state[tab + "_names"] = names
+            st.success(f"使用: {method} (seed={seed}) 偏差={var:.2f}")
 
-    if f"{tab}_pool" not in st.session_state:
-        method, seed, var, pool = find_best_seed_and_method(3, 10, num_names)
-        st.session_state[f"{tab}k"] = 3
-        st.session_state[f"{tab}l"] = 10
-        st.session_state[f"{tab}n"] = num_names
-        st.session_state[f"{tab}_pool"] = pool
+        # 履歴読み込み（手動）
+        uploaded = st.file_uploader("📂 履歴CSVを読み込み", type="csv", key=tab + "_csv")
+        if uploaded:
+            df = pd.read_csv(uploaded)
+            if "番号" in df.columns and "名前" in df.columns:
+                st.session_state[tab + "_used"] = [int(i)-1 for i in df["番号"]]
+                st.session_state[tab + "_names"] = df["名前"].tolist()
+                st.success("✅ 履歴を読み込みました！")
 
-    # MP3ファイルアップロード
-    mp3_file = st.file_uploader("🎵 MP3ファイル（任意）", type="mp3", key=f"{tab}_mp3")
-
-    # 指名ボタン
-    if st.button("📢 指名！"):
-        used = st.session_state[f"{tab}_used"]
-        pool = st.session_state[f"{tab}_pool"]
-        available = [i for i in range(len(names)) if i not in used and names[i] not in absentees and names[i]]
-        if not available:
-            st.warning("⚠️ 指名できる人がいません")
-        else:
-            next_index = None
-            for i in pool:
-                if i in available:
-                    next_index = i
-                    break
-            if next_index is None:
-                st.warning("⚠️ すべての生徒を指名済みです。")
+        if st.button("🎯 指名！", key=tab + "_pick"):
+            if tab + "_order" not in st.session_state:
+                st.warning("⚠️ まず『準備する』を押してください。")
             else:
-                st.success(f"🎉 指名: {names[next_index]}")
-                st.session_state[f"{tab}_used"].append(next_index)
-                if st.session_state.sound_on and mp3_file:
-                    play_audio_if_needed(mp3_file)
+                order = st.session_state[tab + "_order"]
+                used = st.session_state.get(tab + "_used", [])
+                remaining = [i for i in order if i not in used and i in available]
+                if not remaining:
+                    st.error("⛔ 指名できる人がいません。")
+                else:
+                    choice = random.choice(remaining)
+                    st.session_state[tab + "_used"].append(choice)
+                    st.markdown(f"<h2 style='text-align:center; color:green;'>🎉 {choice+1}番：{names[choice]} 🎉</h2>", unsafe_allow_html=True)
+                    if mp3 and st.session_state.sound_on:
+                        play_audio_if_needed(mp3)
 
-    # 履歴保存（CSV）
-    if st.session_state.auto_save and st.session_state.get(f"{tab}_used"):
-        df = pd.DataFrame({
-            "番号": [i + 1 for i in st.session_state[f"{tab}_used"]],
-            "名前": [names[i] for i in st.session_state[f"{tab}_used"]],
-            "日時": [datetime.now(JST).strftime("%Y-%m-%d %H:%M")] * len(st.session_state[f"{tab}_used"]),
-            "音ON": [st.session_state.sound_on] * len(st.session_state[f"{tab}_used"]),
-            "自動保存ON": [st.session_state.auto_save] * len(st.session_state[f"{tab}_used"]),
-            "クラス名": [tab] * len(st.session_state[f"{tab}_used"]),
-            "k": [st.session_state[f"{tab}k"]] * len(st.session_state[f"{tab}_used"]),
-            "l": [st.session_state[f"{tab}l"]] * len(st.session_state[f"{tab}_used"]),
-            "n": [st.session_state[f"{tab}n"]] * len(st.session_state[f"{tab}_used"])
-        })
-        df.to_csv(latest_path, index=False)
+        # 履歴保存
+        used = st.session_state.get(tab + "_used", [])
+        if used:
+            df = pd.DataFrame([
+                (i+1, names[i]) for i in used
+            ], columns=["番号", "名前"])
+            csv = io.StringIO(); df.to_csv(csv, index=False)
+            timestamp = datetime.now(JST).strftime("%Y%m%d_%H%M")
+            filename = f"{tab}_履歴_{timestamp}.csv"
+            st.download_button("⬇️ 履歴ダウンロード", csv.getvalue(), file_name=filename)
 
-    # 履歴ダウンロード
-    if st.session_state.get(f"{tab}_used"):
-        if st.download_button(
-            label="📥 指名履歴をダウンロード",
-            data=df.to_csv(index=False).encode("utf-8"),
-            file_name=f"{tab}_指名履歴.csv",
-            mime="text/csv"
-        ):
-            st.toast("✅ ダウンロードしました")
+            if st.session_state.auto_save:
+                with open(f"history/{tab}_最新.csv", "w", encoding="utf-8") as f:
+                    f.write(csv.getvalue())
 
-    # 履歴手動読み込み
-    uploaded = st.file_uploader("📤 指名履歴CSVを読み込み", type=["csv"], key=f"{tab}_upload_csv")
-    if uploaded:
-        df_new = pd.read_csv(uploaded)
-        try:
-            if {"番号", "名前"}.issubset(df_new.columns):
-                st.session_state[f"{tab}_used"] = [int(x) - 1 for x in df_new["番号"]]
-                st.session_state[f"{tab}_names"] = df_new["名前"].tolist()
-                st.success("📖 履歴を読み込みました")
-            else:
-                st.error("❌ 正しい形式のCSVではありません（番号・名前列が必要）")
-        except Exception as e:
-            st.error(f"エラー: {e}")
-
-if __name__ == "__main__":
-    run_app()
+            st.write("📋 指名済み一覧", df)
