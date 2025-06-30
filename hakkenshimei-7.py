@@ -6,13 +6,9 @@ import math
 from collections import Counter
 from datetime import timedelta, timezone
 
-# タイムゾーン設定（必要なら）
 JST = timezone(timedelta(hours=9))
-
-# 履歴保存ディレクトリ
 os.makedirs("history", exist_ok=True)
 
-# 乱数生成法定義
 class Xorshift:
     def __init__(self, seed):
         self.state = seed if seed != 0 else 1
@@ -78,7 +74,7 @@ def find_best_seed_and_method(k, l, n):
     return best[1], best[2], best[0], best[3]
 
 def run_app():
-    st.title("\U0001F3B2 指名アプリ")
+    st.title("🎲 指名アプリ")
 
     if "class_list" not in st.session_state:
         st.session_state.class_list = ["クラスA", "クラスB", "クラスC"]
@@ -89,12 +85,12 @@ def run_app():
     if "loading" not in st.session_state:
         st.session_state.loading = False
 
-    with st.sidebar.expander("\U0001F527 設定"):
-        st.session_state.sound_on = st.checkbox("\U0001F50A 指名時に音を鳴らす", value=st.session_state.sound_on)
-        st.session_state.auto_save = st.checkbox("\U0001F4BE 自動で履歴を保存する", value=st.session_state.auto_save)
+    with st.sidebar.expander("🔧 設定"):
+        st.session_state.sound_on = st.checkbox("🔊 指名時に音を鳴らす", value=st.session_state.sound_on)
+        st.session_state.auto_save = st.checkbox("💾 自動で履歴を保存する", value=st.session_state.auto_save)
 
     with st.sidebar.expander("⚙️ クラス設定"):
-        selected = st.selectbox("\U0001F4DD クラス名を変更または削除", st.session_state.class_list, key="class_edit")
+        selected = st.selectbox("📝 クラス名を変更または削除", st.session_state.class_list, key="class_edit")
         new_name = st.text_input("✏️ 新しいクラス名", key="rename_input")
         col1, col2 = st.columns(2)
         with col1:
@@ -115,9 +111,9 @@ def run_app():
         if st.button("クラス追加") and new_class and new_class not in st.session_state.class_list:
             st.session_state.class_list.append(new_class)
 
-    tab = st.sidebar.selectbox("\U0001F4DA クラス選択", st.session_state.class_list)
+    tab = st.sidebar.selectbox("📚 クラス選択", st.session_state.class_list)
 
-    st.sidebar.markdown("### \U0001F4C4 履歴の読み込み")
+    st.sidebar.markdown("### 📤 履歴の読み込み")
     uploaded_csv = st.sidebar.file_uploader("CSV形式のファイルを選択", type="csv")
     if uploaded_csv:
         try:
@@ -148,7 +144,6 @@ def run_app():
                 st.session_state[tab + "l"],
                 st.session_state[tab + "n"]
             )
-            random.shuffle(pool)
             st.session_state[tab + "_pool"] = pool
 
             st.toast("✅ 履歴を読み込みました！")
@@ -157,7 +152,7 @@ def run_app():
         except Exception as e:
             st.error(f"読み込みエラー: {e}")
 
-    st.header(f"\U0001F4CB {tab} の設定")
+    st.header(f"📋 {tab} の設定")
 
     k = st.number_input("年間授業回数", value=st.session_state.get(tab + "k", 30), min_value=1, key=tab + "k")
     l = st.number_input("授業1回あたりの平均指名人数", value=st.session_state.get(tab + "l", 5), min_value=1, key=tab + "l")
@@ -181,7 +176,7 @@ def run_app():
     if f"{tab}_used" not in st.session_state:
         st.session_state[tab + "_used"] = []
 
-    if st.button("\U0001F4CA 指名する準備を整える！", key=tab + "_gen"):
+    if st.button("📊 指名する準備を整える！", key=tab + "_gen"):
         st.session_state.loading = True
         with st.spinner("準備中です。少しお待ちください。"):
             method, seed, var, pool = find_best_seed_and_method(k, l, len(names))
@@ -205,21 +200,23 @@ def run_app():
     absents = [x.strip() for x in absent_input.split("\n") if x.strip()]
     available = [i for i, name in enumerate(names) if name not in absents]
 
-    st.subheader("\U0001F3AF 指名！")
+    st.subheader("🎯 指名！")
+
     pool = st.session_state.get(tab + "_pool", [])
     used = st.session_state.get(tab + "_used", [])
-    remaining = [i for i in pool if i not in used and i in available]
 
-    st.write(f"🎯 残り指名可能人数: {len(remaining)} 人")
+    remaining_indices = [i for i in range(len(pool)) if i not in used and pool[i] in available]
+    st.write(f"残り指名可能人数: {len(remaining_indices)}人")
 
-    if st.button("\U0001F446 指名する", key=tab + "_pick"):
-        if not remaining:
-            st.warning("⚠️ 指名できる人がいません（全員指名済 or 欠席）")
+    if st.button("👆 指名する", key=tab + "_pick"):
+        if not remaining_indices:
+            st.warning("⚠️ 指名できる人がいません（乱数プールをすべて使い切りました）")
         else:
-            sel = remaining[0]
-            st.session_state[tab + "_used"].append(sel)
+            next_index = remaining_indices[0]
+            sel = pool[next_index]
+            st.session_state[tab + "_used"].append(next_index)
             st.markdown(
-                f"<div style='font-size:40px; text-align:center; color:green; font-weight: bold;'>🎉 {sel + 1}番: {names[sel]} 🎉</div>",
+                f"<div style='font-size:40px; text-align:center; font-weight:bold; color:green;'>🎉 {sel + 1}番: {names[sel]} 🎉</div>",
                 unsafe_allow_html=True
             )
 
@@ -227,7 +224,7 @@ def run_app():
         {
             "番号": i + 1,
             "名前": names[i],
-            "指名済": i in used,
+            "指名済": any(pool[j] == i for j in used),
             "音ON": st.session_state.sound_on,
             "自動保存ON": st.session_state.auto_save,
             "クラス名": tab,
@@ -239,9 +236,9 @@ def run_app():
     ])
 
     if len(df) > 0:
-        st.subheader("\U0001F4CB 指名履歴（指名された順）")
+        st.subheader("📋 指名履歴（指名された順）")
         ordered_df = pd.DataFrame([
-            {"番号": i + 1, "名前": names[i]} for i in used
+            {"番号": pool[i] + 1, "名前": names[pool[i]]} for i in used
         ])
         st.dataframe(ordered_df)
 
