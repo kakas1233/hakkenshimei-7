@@ -1,4 +1,4 @@
-#import streamlit as st
+import streamlit as st
 import pandas as pd
 import os
 import random
@@ -78,7 +78,7 @@ def find_best_seed_and_method(k, l, n):
     return best[1], best[2], best[0], best[3]
 
 def run_app():
-    st.title("🎲 指名アプリ（完全版）")
+    st.title("\U0001F3B2 指名アプリ（完全版）")
 
     if "class_list" not in st.session_state:
         st.session_state.class_list = ["クラスA", "クラスB", "クラスC"]
@@ -89,8 +89,8 @@ def run_app():
     if "loading" not in st.session_state:
         st.session_state.loading = False
 
-    with st.sidebar.expander("🔧 設定"):
-        st.session_state.sound_on = st.checkbox("🔊 指名時に音を鳴らす", value=st.session_state.sound_on)
+    with st.sidebar.expander("\U0001F527 設定"):
+        st.session_state.sound_on = st.checkbox("\U0001F50A 指名時に音を鳴らす", value=st.session_state.sound_on)
         st.session_state.auto_save = st.checkbox("💾 自動で履歴を保存する", value=st.session_state.auto_save)
 
     with st.sidebar.expander("⚙️ クラス設定"):
@@ -122,8 +122,6 @@ def run_app():
     if uploaded_csv:
         try:
             df = pd.read_csv(uploaded_csv)
-
-            # 名前リスト復元
             names_from_csv = df["名前"].tolist()
             expected_n = int(df["n"].iloc[0])
             if len(names_from_csv) < expected_n:
@@ -132,33 +130,28 @@ def run_app():
                 names_from_csv = names_from_csv[:expected_n]
             st.session_state[tab + "_names"] = names_from_csv
 
-            # used番号の復元
             if "指名済" in df.columns:
                 st.session_state[tab + "_used"] = [i for i, row in df.iterrows() if row["指名済"]]
             else:
                 st.session_state[tab + "_used"] = [int(row["番号"]) - 1 for _, row in df.iterrows()]
 
-            # その他の設定を復元
             st.session_state.sound_on = bool(df["音ON"].iloc[0])
             st.session_state.auto_save = bool(df["自動保存ON"].iloc[0])
             st.session_state[tab + "k"] = int(df["k"].iloc[0])
             st.session_state[tab + "l"] = int(df["l"].iloc[0])
             st.session_state[tab + "n"] = expected_n
 
-            # プール再生成
             _, _, _, pool = find_best_seed_and_method(
                 st.session_state[tab + "k"],
                 st.session_state[tab + "l"],
                 st.session_state[tab + "n"]
             )
             st.session_state[tab + "_pool"] = pool
-
             st.toast("✅ 手動で履歴CSVを読み込みました！")
         except Exception as e:
             st.error(f"読み込みエラー: {e}")
 
     st.header(f"📋 {tab} の設定")
-
     k = st.number_input("年間授業回数", value=st.session_state.get(tab + "k", 30), min_value=1, key=tab + "k")
     l = st.number_input("授業1回あたりの平均指名人数", value=st.session_state.get(tab + "l", 5), min_value=1, key=tab + "l")
     n = st.number_input("クラス人数", value=st.session_state.get(tab + "n", 40), min_value=1, key=tab + "n")
@@ -231,9 +224,7 @@ def run_app():
     ])
 
     if len(df) > 0:
-        st.subheader("📋 指名履歴")
-
-        # ⬇️ 指名された人だけを表示（指名済 == True）
+        st.subheader("📋 指名履歴（指名された人のみ）")
         used_df = df[df["指名済"] == True]
         st.dataframe(used_df[["番号", "名前"]])
 
