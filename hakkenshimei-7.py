@@ -6,10 +6,7 @@ import math
 from collections import Counter
 from datetime import timedelta, timezone
 
-# タイムゾーン設定
 JST = timezone(timedelta(hours=9))
-
-# 履歴保存ディレクトリ
 os.makedirs("history", exist_ok=True)
 
 # 乱数生成法定義
@@ -88,13 +85,13 @@ def run_app():
         st.session_state.sound_on = False
     if "loading" not in st.session_state:
         st.session_state.loading = False
+    if "mp3_file" not in st.session_state:
+        st.session_state.mp3_file = None
 
     with st.sidebar.expander("🔧 設定"):
         st.session_state.sound_on = st.checkbox("🔊 指名時に音を鳴らす", value=st.session_state.sound_on)
         st.session_state.auto_save = st.checkbox("💾 自動で履歴を保存する", value=st.session_state.auto_save)
-        uploaded_audio = st.file_uploader("🎵 mp3ファイルをアップロード（任意）", type=["mp3"])
-        if uploaded_audio:
-            st.session_state["mp3_data"] = uploaded_audio.read()
+        st.session_state.mp3_file = st.file_uploader("🎵 mp3ファイルをアップロード（任意）", type=["mp3"])
 
     with st.sidebar.expander("⚙️ クラス設定"):
         selected = st.selectbox("📝 クラス名を変更または削除", st.session_state.class_list, key="class_edit")
@@ -148,7 +145,7 @@ def run_app():
         st.session_state.loading = True
         with st.spinner("準備中です。少しお待ちください。"):
             method, seed, var, pool = find_best_seed_and_method(k, l, len(names))
-            random.shuffle(pool)
+            random.shuffle(pool)  # ←指名順ランダム化
             std = math.sqrt(var)
             exp = (k * l) / len(names)
             st.session_state[tab + "_pool"] = pool
@@ -180,22 +177,18 @@ def run_app():
     if st.button("👆 指名する", key=tab + "_pick"):
         pool = st.session_state.get(tab + "_pool", [])
         used = st.session_state.get(tab + "_used", [])
-        counts = Counter(pool)
-        remaining = [i for i in pool if i in available and used.count(i) < counts[i]]
+        remaining = [i for i in pool if i not in used and i in available]
         if not remaining:
             st.warning("⚠️ 指名できる人がいません（全員指名済 or 欠席）")
         else:
-            sel = random.choice(remaining)
-
+            sel = remaining[0]
             st.session_state[tab + "_used"].append(sel)
-
-            if st.session_state.sound_on and st.session_state.get("mp3_data"):
-                st.audio(st.session_state["mp3_data"], format="audio/mp3", start_time=0)
-
             st.markdown(
-                f"<div style='font-size:40px; text-align:center; color:green; font-weight:bold;'>🎉 {sel + 1}番: {names[sel]} 🎉</div>",
+                f"<div style='font-size:45px; font-weight:bold; text-align:center; color:green;'>🎉 {sel + 1}番: {names[sel]} 🎉</div>",
                 unsafe_allow_html=True
             )
+            if st.session_state.sound_on and st.session_state.mp3_file:
+                st.audio(st.session_state.mp3_file, format='audio/mp3')
 
     pool = st.session_state.get(tab + "_pool", [])
     used = st.session_state.get(tab + "_used", [])
