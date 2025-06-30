@@ -123,19 +123,37 @@ def run_app():
     if uploaded_csv:
         try:
             df = pd.read_csv(uploaded_csv)
+
+            # used 番号の復元（番号は1-indexedで保存してある）
             st.session_state[tab + "_used"] = [int(row["番号"]) - 1 for _, row in df.iterrows()]
-            st.session_state[tab + "_names"] = df["名前"].tolist()
+
+            # 名前リスト復元
+            names_from_csv = df["名前"].tolist()
+            expected_n = int(df["n"].iloc[0])
+
+            # 足りない名前は補完、余分な名前はカット
+            if len(names_from_csv) < expected_n:
+                names_from_csv += [f"名前{i+1}" for i in range(len(names_from_csv), expected_n)]
+            elif len(names_from_csv) > expected_n:
+                names_from_csv = names_from_csv[:expected_n]
+
+            st.session_state[tab + "_names"] = names_from_csv
+
+            # その他のパラメータを復元
             st.session_state.sound_on = bool(df["音ON"].iloc[0])
             st.session_state.auto_save = bool(df["自動保存ON"].iloc[0])
             st.session_state[tab + "k"] = int(df["k"].iloc[0])
             st.session_state[tab + "l"] = int(df["l"].iloc[0])
-            st.session_state[tab + "n"] = int(df["n"].iloc[0])
+            st.session_state[tab + "n"] = expected_n
+
+            # プール生成
             _, _, _, pool = find_best_seed_and_method(
                 st.session_state[tab + "k"],
                 st.session_state[tab + "l"],
                 st.session_state[tab + "n"]
             )
             st.session_state[tab + "_pool"] = pool
+
             st.toast("✅ 手動で履歴CSVを読み込みました！")
         except Exception as e:
             st.error(f"読み込みエラー: {e}")
