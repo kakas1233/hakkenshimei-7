@@ -6,9 +6,11 @@ import math
 from collections import Counter
 from datetime import timedelta, timezone
 
+# タイムゾーン設定
 JST = timezone(timedelta(hours=9))
 os.makedirs("history", exist_ok=True)
 
+# 乱数生成法
 class Xorshift:
     def __init__(self, seed):
         self.state = seed if seed != 0 else 1
@@ -144,6 +146,7 @@ def run_app():
                 st.session_state[tab + "l"],
                 st.session_state[tab + "n"]
             )
+            random.shuffle(pool)
             st.session_state[tab + "_pool"] = pool
 
             st.toast("✅ 履歴を読み込みました！")
@@ -162,7 +165,6 @@ def run_app():
                              height=120,
                              key=tab + "_name_input",
                              value=st.session_state.get(tab + "_name_input", ""))
-
     raw = [x.strip() for x in name_input.split("\n") if x.strip()]
     if len(raw) < n:
         raw += [f"名前{i+1}" for i in range(len(raw), n)]
@@ -170,7 +172,6 @@ def run_app():
         raw = raw[:n]
     names = raw
     st.session_state[tab + "_names"] = names
-
     st.write("👥 メンバー:", [f"{i+1} : {name}" for i, name in enumerate(names)])
 
     if f"{tab}_used" not in st.session_state:
@@ -196,35 +197,36 @@ def run_app():
             )
 
     st.subheader("🚫 欠席者（指名除外）")
-    absent_input = st.text_area("欠席者の名前（改行区切り）※上で入力した名前と同じ表記をしてください", height=80, key=tab + "_absent_input")
+    absent_input = st.text_area("欠席者の名前（改行区切り）", height=80, key=tab + "_absent_input")
     absents = [x.strip() for x in absent_input.split("\n") if x.strip()]
     available = [i for i, name in enumerate(names) if name not in absents]
 
     st.subheader("🎯 指名！")
-
-    pool = st.session_state.get(tab + "_pool", [])
-    used = st.session_state.get(tab + "_used", [])
-
-    remaining_indices = [i for i in range(len(pool)) if i not in used and pool[i] in available]
-    st.write(f"残り指名可能人数: {len(remaining_indices)}人")
-
     if st.button("👆 指名する", key=tab + "_pick"):
-        if not remaining_indices:
-            st.warning("⚠️ 指名できる人がいません（乱数プールをすべて使い切りました）")
+        pool = st.session_state.get(tab + "_pool", [])
+        used = st.session_state.get(tab + "_used", [])
+        remaining = [i for i in pool if i not in used and i in available]
+        if not remaining:
+            st.warning("⚠️ 指名できる人がいません（全員指名済 or 欠席）")
         else:
-            next_index = remaining_indices[0]
-            sel = pool[next_index]
-            st.session_state[tab + "_used"].append(next_index)
+            sel = remaining[0]
+            st.session_state[tab + "_used"] = used + [sel]
             st.markdown(
-                f"<div style='font-size:40px; text-align:center; font-weight:bold; color:green;'>🎉 {sel + 1}番: {names[sel]} 🎉</div>",
+                f"<div style='font-size:42px; text-align:center; color:green; font-weight:bold;'>🎉 {sel + 1}番: {names[sel]} 🎉</div>",
                 unsafe_allow_html=True
             )
 
+    total_pool = st.session_state.get(tab + "_pool", [])
+    used_now = st.session_state.get(tab + "_used", [])
+    remaining_count = len([i for i in total_pool if i in available and i not in used_now])
+    st.info(f"🧮 残り指名可能人数: {remaining_count} 人")
+
+    used = st.session_state.get(tab + "_used", [])
     df = pd.DataFrame([
         {
             "番号": i + 1,
             "名前": names[i],
-            "指名済": any(pool[j] == i for j in used),
+            "指名済": i in used,
             "音ON": st.session_state.sound_on,
             "自動保存ON": st.session_state.auto_save,
             "クラス名": tab,
@@ -238,14 +240,14 @@ def run_app():
     if len(df) > 0:
         st.subheader("📋 指名履歴（指名された順）")
         ordered_df = pd.DataFrame([
-            {"番号": pool[i] + 1, "名前": names[pool[i]]} for i in used
+            {"番号": i + 1, "名前": names[i]} for i in used
         ])
         st.dataframe(ordered_df)
 
         if st.session_state.auto_save:
             df.to_csv(f"history/{tab}_最新.csv", index=False)
 
-        st.download_button("⬇️ 履歴ダウンロード(必ずダウンロードしてからサイトを離れてください)", df.to_csv(index=False), file_name=f"{tab}_履歴.csv")
+        st.download_button("⬇️ 履歴ダウンロード", df.to_csv(index=False), file_name=f"{tab}_履歴.csv")
 
     if tab + "_pool" in st.session_state and st.session_state[tab + "_pool"]:
         st.subheader("📈 年間指名回数の統計")
