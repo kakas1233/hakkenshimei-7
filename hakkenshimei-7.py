@@ -117,6 +117,47 @@ def run_app():
 
     tab = st.sidebar.selectbox("📚 クラス選択", st.session_state.class_list)
 
+    # --- 履歴の読み込み（復活させました） ---
+    st.sidebar.markdown("### 📤 履歴の読み込み")
+    uploaded_csv = st.sidebar.file_uploader("CSV形式のファイルを選択", type="csv")
+    if uploaded_csv:
+        try:
+            df = pd.read_csv(uploaded_csv)
+            names_from_csv = df["名前"].tolist()
+            expected_n = int(df["n"].iloc[0])
+            if len(names_from_csv) < expected_n:
+                names_from_csv += [f"名前{i+1}" for i in range(len(names_from_csv), expected_n)]
+            elif len(names_from_csv) > expected_n:
+                names_from_csv = names_from_csv[:expected_n]
+
+            st.session_state[tab + "_names"] = names_from_csv
+            st.session_state[tab + "_name_input"] = "\n".join(names_from_csv)
+
+            if "指名済" in df.columns:
+                st.session_state[tab + "_used"] = [i for i, row in df.iterrows() if row["指名済"]]
+            else:
+                st.session_state[tab + "_used"] = [int(row["番号"]) - 1 for _, row in df.iterrows()]
+
+            st.session_state.sound_on = bool(df["音ON"].iloc[0])
+            st.session_state.auto_save = bool(df["自動保存ON"].iloc[0])
+            st.session_state[tab + "k"] = int(df["k"].iloc[0])
+            st.session_state[tab + "l"] = int(df["l"].iloc[0])
+            st.session_state[tab + "n"] = expected_n
+
+            _, _, _, pool = find_best_seed_and_method(
+                st.session_state[tab + "k"],
+                st.session_state[tab + "l"],
+                st.session_state[tab + "n"]
+            )
+            st.session_state[tab + "_pool"] = pool
+
+            st.toast("✅ 履歴を読み込みました！")
+
+            st.experimental_rerun()  # 強制再実行して反映
+
+        except Exception as e:
+            st.error(f"読み込みエラー: {e}")
+
     st.header(f"📋 {tab} の設定")
 
     k = st.number_input("年間授業回数", value=st.session_state.get(tab + "k", 30), min_value=1, key=tab + "k")
@@ -173,14 +214,14 @@ def run_app():
         if not remaining:
             st.warning("⚠️ 指名できる人がいません（全員指名済 or 欠席）")
         else:
-            sel = remaining[0]  # シャッフル済みの順に
+            sel = remaining[0]
             st.session_state[tab + "_used"].append(sel)
+            # 文字太く大きく調整（font-weight:bold; + font-size:48px）
             st.markdown(
-                f"<div style='font-size:40px; text-align:center; color:green;'>🎉 {sel + 1}番: {names[sel]} 🎉</div>",
+                f"<div style='font-size:48px; font-weight:bold; text-align:center; color:green;'>🎉 {sel + 1}番: {names[sel]} 🎉</div>",
                 unsafe_allow_html=True
             )
 
-    # 残り指名可能人数をここで最新計算して表示（指名後も更新されるように）
     pool = st.session_state.get(tab + "_pool", [])
     used = st.session_state.get(tab + "_used", [])
     absent_indexes = [i for i, name in enumerate(names) if name in absents]
