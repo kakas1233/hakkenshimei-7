@@ -6,7 +6,7 @@ import math
 from collections import Counter
 from datetime import timedelta, timezone
 
-# タイムゾーン設定
+# タイムゾーン設定（必要なら）
 JST = timezone(timedelta(hours=9))
 
 # 履歴保存ディレクトリ
@@ -78,7 +78,7 @@ def find_best_seed_and_method(k, l, n):
     return best[1], best[2], best[0], best[3]
 
 def run_app():
-    st.title("\U0001F3B2 指名アプリ（完全版）")
+    st.title("🎲 指名アプリ（完全版）")
 
     if "class_list" not in st.session_state:
         st.session_state.class_list = ["クラスA", "クラスB", "クラスC"]
@@ -89,8 +89,8 @@ def run_app():
     if "loading" not in st.session_state:
         st.session_state.loading = False
 
-    with st.sidebar.expander("\U0001F527 設定"):
-        st.session_state.sound_on = st.checkbox("\U0001F50A 指名時に音を鳴らす", value=st.session_state.sound_on)
+    with st.sidebar.expander("🔧 設定"):
+        st.session_state.sound_on = st.checkbox("🔊 指名時に音を鳴らす", value=st.session_state.sound_on)
         st.session_state.auto_save = st.checkbox("💾 自動で履歴を保存する", value=st.session_state.auto_save)
 
     with st.sidebar.expander("⚙️ クラス設定"):
@@ -128,7 +128,9 @@ def run_app():
                 names_from_csv += [f"名前{i+1}" for i in range(len(names_from_csv), expected_n)]
             elif len(names_from_csv) > expected_n:
                 names_from_csv = names_from_csv[:expected_n]
+
             st.session_state[tab + "_names"] = names_from_csv
+            st.session_state[tab + "_name_input"] = "\n".join(names_from_csv)
 
             if "指名済" in df.columns:
                 st.session_state[tab + "_used"] = [i for i, row in df.iterrows() if row["指名済"]]
@@ -147,16 +149,26 @@ def run_app():
                 st.session_state[tab + "n"]
             )
             st.session_state[tab + "_pool"] = pool
+
             st.toast("✅ 手動で履歴CSVを読み込みました！")
+
+            st.experimental_rerun()  # ← これで画面を再実行して反映強制
+
         except Exception as e:
             st.error(f"読み込みエラー: {e}")
 
     st.header(f"📋 {tab} の設定")
+
     k = st.number_input("年間授業回数", value=st.session_state.get(tab + "k", 30), min_value=1, key=tab + "k")
     l = st.number_input("授業1回あたりの平均指名人数", value=st.session_state.get(tab + "l", 5), min_value=1, key=tab + "l")
     n = st.number_input("クラス人数", value=st.session_state.get(tab + "n", 40), min_value=1, key=tab + "n")
 
-    name_input = st.text_area("名前を改行区切りで入力（足りない分は自動補完）", height=120, key=tab + "_name_input")
+    # ここでvalue=にsession_stateの内容を必ず入れる
+    name_input = st.text_area("名前を改行区切りで入力（足りない分は自動補完）",
+                             height=120,
+                             key=tab + "_name_input",
+                             value=st.session_state.get(tab + "_name_input", ""))
+
     raw = [x.strip() for x in name_input.split("\n") if x.strip()]
     if len(raw) < n:
         raw += [f"名前{i+1}" for i in range(len(raw), n)]
@@ -164,6 +176,7 @@ def run_app():
         raw = raw[:n]
     names = raw
     st.session_state[tab + "_names"] = names
+
     st.write("👥 メンバー:", [f"{i+1} : {name}" for i, name in enumerate(names)])
 
     if f"{tab}_used" not in st.session_state:
