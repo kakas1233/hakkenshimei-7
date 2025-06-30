@@ -194,10 +194,10 @@ def run_app():
 
         absent_input = st.text_area("⛔ 欠席者（1回の指名ごとに設定）", height=80, key=tab + "absent")
         absents = [x.replace("　", "").strip() for x in absent_input.split("\n") if x.strip()]
-        names = [x.replace("　", "").strip() for x in names]
+      names = st.session_state[tab + "_names"]
+      names = [x.replace("　", "").strip() for x in names]
 
-        available = [i for i, name in enumerate(names) if name not in absents]
-
+      available = [i for i, name in enumerate(names) if name not in absents]
         if not available:
             st.error("⚠️ 欠席者の設定により、指名可能な生徒がいません。")
 
