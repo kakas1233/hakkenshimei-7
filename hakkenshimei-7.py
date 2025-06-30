@@ -6,7 +6,7 @@ import math
 from collections import Counter
 from datetime import timedelta, timezone
 
-# タイムゾーン設定（必要なら）
+    # タイムゾーン設定（必要なら）
 JST = timezone(timedelta(hours=9))
 
 # 履歴保存ディレクトリ
@@ -211,24 +211,34 @@ def run_app():
                 unsafe_allow_html=True
             )
 
-    # 指名履歴データフレーム作成
+        # 指名履歴データフレーム作成
     used = st.session_state.get(tab + "_used", [])
-    df = pd.DataFrame([
-        {"番号": idx + 1, "名前": names[idx], "音ON": st.session_state.sound_on,
-         "自動保存ON": st.session_state.auto_save, "クラス名": tab,
+    
+    # 表示用（番号と名前のみ）
+    df_display = pd.DataFrame([
+        {"番号": idx + 1, "名前": names[idx]}
+        for idx in used
+    ])
+    
+    # 保存・ダウンロード用（追加情報を含む）
+    df_save = pd.DataFrame([
+        {"番号": idx + 1, "名前": names[idx],
+         "音ON": st.session_state.sound_on,
+         "自動保存ON": st.session_state.auto_save,
+         "クラス名": tab,
          "k": k, "l": l, "n": n}
         for idx in used
     ])
 
-    if len(df) > 0:
+    if len(df_display) > 0:
         st.subheader("📋 指名履歴")
-        st.dataframe(df)
+        st.dataframe(df_display)
 
         if st.session_state.auto_save:
-            df.to_csv(f"history/{tab}_最新.csv", index=False)
+            df_save.to_csv(f"history/{tab}_最新.csv", index=False)
 
-        st.download_button("⬇️ CSVダウンロード", df.to_csv(index=False), file_name=f"{tab}_履歴.csv")
-
+        st.download_button("⬇️ CSVダウンロード", df_save.to_csv(index=False), file_name=f"{tab}_履歴.csv")
+        
     # --- 乱数生成後の指名回数の統計表示 ---
     if tab + "_pool" in st.session_state and st.session_state[tab + "_pool"]:
         st.subheader("📈 指名回数の統計")
