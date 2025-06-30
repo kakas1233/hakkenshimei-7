@@ -124,29 +124,30 @@ def run_app():
         try:
             df = pd.read_csv(uploaded_csv)
 
-            # used 番号の復元（番号は1-indexedで保存してある）
-            st.session_state[tab + "_used"] = [int(row["番号"]) - 1 for _, row in df.iterrows()]
-
             # 名前リスト復元
             names_from_csv = df["名前"].tolist()
             expected_n = int(df["n"].iloc[0])
-
-            # 足りない名前は補完、余分な名前はカット
             if len(names_from_csv) < expected_n:
                 names_from_csv += [f"名前{i+1}" for i in range(len(names_from_csv), expected_n)]
             elif len(names_from_csv) > expected_n:
                 names_from_csv = names_from_csv[:expected_n]
-
             st.session_state[tab + "_names"] = names_from_csv
 
-            # その他のパラメータを復元
+            # used番号の復元
+            if "指名済" in df.columns:
+                st.session_state[tab + "_used"] = [i for i, row in df.iterrows() if row["指名済"]]
+            else:
+                # 古い形式（指名済列なし）の互換対応
+                st.session_state[tab + "_used"] = [int(row["番号"]) - 1 for _, row in df.iterrows()]
+
+            # その他の設定を復元
             st.session_state.sound_on = bool(df["音ON"].iloc[0])
             st.session_state.auto_save = bool(df["自動保存ON"].iloc[0])
             st.session_state[tab + "k"] = int(df["k"].iloc[0])
             st.session_state[tab + "l"] = int(df["l"].iloc[0])
             st.session_state[tab + "n"] = expected_n
 
-            # プール生成
+            # プール再生成（復元には必要）
             _, _, _, pool = find_best_seed_and_method(
                 st.session_state[tab + "k"],
                 st.session_state[tab + "l"],
@@ -217,12 +218,20 @@ def run_app():
 
     used = st.session_state.get(tab + "_used", [])
     df = pd.DataFrame([
-        {"番号": idx + 1, "名前": names[idx], "音ON": st.session_state.sound_on,
-         "自動保存ON": st.session_state.auto_save, "クラス名": tab,
-         "k": k, "l": l, "n": n}
-        for idx in used
-    ])
-
+    {
+        "番号": i + 1,
+        "名前": names[i],
+        "指名済": i in used,
+        "音ON": st.session_state.sound_on,
+        "自動保存ON": st.session_state.auto_save,
+        "クラス名": tab,
+        "k": k,
+        "l": l,
+        "n": n
+    }
+    for i in range(len(names))
+])
+#
     if len(df) > 0:
         st.subheader("📋 指名履歴")
         st.dataframe(df[["番号", "名前"]])
