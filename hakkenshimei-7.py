@@ -205,8 +205,14 @@ def run_app():
     pool = st.session_state.get(tab + "_pool", [])
     used = st.session_state.get(tab + "_used", [])
 
+    # ここだけ修正: 残り指名可能人数は
+    # poolにいる欠席者を除いた番号の数からusedで使った数を引く
+    available_count = len(set(pool) & set(available))
+    used_count = len(used)
+    remaining_count = available_count - used_count
+    st.write(f"残り指名可能人数: {remaining_count}人")
+
     remaining_indices = [i for i in range(len(pool)) if i not in used and pool[i] in available]
-    st.write(f"残り指名可能人数: {len(remaining_indices)}人")
 
     if st.button("👆 指名する", key=tab + "_pick"):
         if not remaining_indices:
