@@ -121,32 +121,32 @@ def run_app():
     # --- クラス選択 ---
     tab = st.sidebar.selectbox("📚 クラス選択", st.session_state.class_list)
 
-# 履歴CSV手動読み込み ---
-st.sidebar.markdown("### 📤 履歴CSVを手動で読み込み")
-uploaded_csv = st.sidebar.file_uploader("CSVを選択", type="csv")
-if uploaded_csv:
-    try:
-        df = pd.read_csv(uploaded_csv)
-        # 復元
-        st.session_state[tab + "_used"] = [int(row["番号"]) - 1 for _, row in df.iterrows()]
-        st.session_state[tab + "_names"] = df["名前"].tolist()
-        st.session_state[tab + "_name_input"] = "\n".join(df["名前"].tolist())  # ← 追加
-        st.session_state.sound_on = bool(df["音ON"].iloc[0])
-        st.session_state.auto_save = bool(df["自動保存ON"].iloc[0])
-        st.session_state[tab + "k"] = int(df["k"].iloc[0])
-        st.session_state[tab + "l"] = int(df["l"].iloc[0])
-        st.session_state[tab + "n"] = len(df)  # ← nの整合性も取る
+    # 履歴CSV手動読み込み ---
+    st.sidebar.markdown("### 📤 履歴CSVを手動で読み込み")
+    uploaded_csv = st.sidebar.file_uploader("CSVを選択", type="csv")
+    if uploaded_csv:
+        try:
+            df = pd.read_csv(uploaded_csv)
+            # 復元
+            st.session_state[tab + "_used"] = [int(row["番号"]) - 1 for _, row in df.iterrows()]
+            st.session_state[tab + "_names"] = df["名前"].tolist()
+            st.session_state[tab + "_name_input"] = "\n".join(df["名前"].tolist())  # ← 追加
+            st.session_state.sound_on = bool(df["音ON"].iloc[0])
+            st.session_state.auto_save = bool(df["自動保存ON"].iloc[0])
+            st.session_state[tab + "k"] = int(df["k"].iloc[0])
+            st.session_state[tab + "l"] = int(df["l"].iloc[0])
+            st.session_state[tab + "n"] = len(df)  # ← nの整合性も取る
 
-        # 乱数プール再生成
-        _, _, _, pool = find_best_seed_and_method(
-            st.session_state[tab + "k"],
-            st.session_state[tab + "l"],
-            st.session_state[tab + "n"]
-        )
-        st.session_state[tab + "_pool"] = pool
-        st.toast("✅ 手動で履歴CSVを読み込みました！")
-    except Exception as e:
-        st.error(f"読み込みエラー: {e}")
+            # 乱数プール再生成
+            _, _, _, pool = find_best_seed_and_method(
+                st.session_state[tab + "k"],
+                st.session_state[tab + "l"],
+                st.session_state[tab + "n"]
+            )
+            st.session_state[tab + "_pool"] = pool
+            st.toast("✅ 手動で履歴CSVを読み込みました！")
+        except Exception as e:
+            st.error(f"読み込みエラー: {e}")
         
     # --- メイン画面 ---
     st.header(f"📋 {tab} の設定")
