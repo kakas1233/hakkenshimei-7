@@ -5,6 +5,7 @@ import random
 import math
 from collections import Counter
 from datetime import timedelta, timezone
+import io
 
 JST = timezone(timedelta(hours=9))
 os.makedirs("history", exist_ok=True)
@@ -105,6 +106,7 @@ def run_app():
         if st.button("追加"):
             if new_class and new_class not in st.session_state.class_list:
                 st.session_state.class_list.append(new_class)
+                st.success("✅ 新しいクラスが追加されました")
 
     tab = st.sidebar.selectbox("📚 クラス選択", st.session_state.class_list)
     st.header(f"📋 {tab} の設定")
@@ -184,6 +186,7 @@ def run_app():
             sel = random.choice(remaining)
             st.session_state[tab + "_used"].append(sel)
 
+            # 音再生をここで呼ぶ（mp3データがあれば）
             if st.session_state.sound_on and st.session_state.get("mp3_data"):
                 st.audio(st.session_state["mp3_data"], format="audio/mp3", start_time=0)
 
@@ -224,9 +227,21 @@ def run_app():
         st.dataframe(ordered_df)
 
         if st.session_state.auto_save:
-            df.to_csv(f"history/{tab}_最新.csv", index=False)
+            # CSVをバイトストリームで安全に書き込み
+            csv_bytes = df.to_csv(index=False).encode("utf-8")
+            with open(f"history/{tab}_最新.csv", "wb") as f:
+                f.write(csv_bytes)
 
-        st.download_button("⬇️ 履歴ダウンロード", df.to_csv(index=False), file_name=f"{tab}_履歴.csv")
+        csv_buffer = io.StringIO()
+        df.to_csv(csv_buffer, index=False)
+        csv_data = csv_buffer.getvalue().encode("utf-8")
+
+        st.download_button(
+            label="⬇️ 履歴ダウンロード",
+            data=csv_data,
+            file_name=f"{tab}_履歴.csv",
+            mime="text/csv"
+        )
 
     if tab + "_pool" in st.session_state and st.session_state[tab + "_pool"]:
         st.subheader("📈 年間指名回数の統計")
@@ -234,18 +249,19 @@ def run_app():
         count_list = [counts.get(i, 0) for i in range(len(names))]
         show_stats = st.selectbox("表示する統計を選択してください",
                                   ["全員の指名回数を一覧表示", "特定の番号の指名回数を見る"],
-                                  key=tab + "_stats_select")
+                                  key=tab + "_stat_select")
 
         if show_stats == "全員の指名回数を一覧表示":
-            stats_df = pd.DataFrame({
-                "番号": range(1, len(names) + 1),
+            stat_df = pd.DataFrame({
+                "番号": list(range(1, len(names)+1)),
                 "名前": names,
                 "指名回数": count_list
             })
-            st.dataframe(stats_df)
+            st.dataframe(stat_df)
         else:
-            num = st.number_input("番号を入力", min_value=1, max_value=len(names), step=1, key=tab + "_stats_num")
-            st.write(f"番号 {num} の {names[num-1]} さんは {count_list[num-1]} 回指名される見込みです。")
+            target_num = st.number_input("調べたい番号（1から）", min_value=1, max_value=len(names), step=1)
+            count = count_list[target_num - 1]
+            st.info(f"📌 {target_num}番「{names[target_num - 1]}」の年間指名回数は **{count}回** です")
 
 if __name__ == "__main__":
     run_app()
