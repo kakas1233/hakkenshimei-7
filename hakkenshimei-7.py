@@ -165,15 +165,6 @@ def run_app():
     absents = [x.strip() for x in absent_input.split("\n") if x.strip()]
     available = [i for i, name in enumerate(names) if name not in absents]
 
-    # 【残り指名可能人数の計算】
-    pool = st.session_state.get(tab + "_pool", [])
-    used = st.session_state.get(tab + "_used", [])
-    absent_indexes = [i for i, name in enumerate(names) if name in absents]
-    counts = Counter(pool)
-    absent_count_in_pool = sum(counts.get(i, 0) for i in absent_indexes)
-    remaining_count = len(pool) - absent_count_in_pool - len(used)
-    st.markdown(f"🔢 **残り指名可能人数: {remaining_count} 人**")
-
     st.subheader("🎯 指名！")
     if st.button("👆 指名する", key=tab + "_pick"):
         pool = st.session_state.get(tab + "_pool", [])
@@ -188,6 +179,15 @@ def run_app():
                 f"<div style='font-size:40px; text-align:center; color:green;'>🎉 {sel + 1}番: {names[sel]} 🎉</div>",
                 unsafe_allow_html=True
             )
+
+    # 残り指名可能人数をここで最新計算して表示（指名後も更新されるように）
+    pool = st.session_state.get(tab + "_pool", [])
+    used = st.session_state.get(tab + "_used", [])
+    absent_indexes = [i for i, name in enumerate(names) if name in absents]
+    counts = Counter(pool)
+    absent_count_in_pool = sum(counts.get(i, 0) for i in absent_indexes)
+    remaining_count = len(pool) - absent_count_in_pool - len(used)
+    st.markdown(f"🔢 **残り指名可能人数: {remaining_count} 人**")
 
     used = st.session_state.get(tab + "_used", [])
     df = pd.DataFrame([
