@@ -6,13 +6,9 @@ import math
 from collections import Counter
 from datetime import timedelta, timezone
 
-# タイムゾーン設定（必要なら）
 JST = timezone(timedelta(hours=9))
-
-# 履歴保存ディレクトリ
 os.makedirs("history", exist_ok=True)
 
-# 乱数生成法定義
 class Xorshift:
     def __init__(self, seed):
         self.state = seed if seed != 0 else 1
@@ -145,7 +141,7 @@ def run_app():
         st.session_state.loading = True
         with st.spinner("準備中です。少しお待ちください。"):
             method, seed, var, pool = find_best_seed_and_method(k, l, len(names))
-            random.shuffle(pool)  # 順番だけランダム化！
+            random.shuffle(pool)  # 順番をランダム化
             std = math.sqrt(var)
             exp = (k * l) / len(names)
             st.session_state[tab + "_pool"] = pool
@@ -163,13 +159,14 @@ def run_app():
     st.subheader("🚫 欠席者（指名除外）")
     absent_input = st.text_area("欠席者の名前（改行区切り）※上で入力した名前と同じ表記をしてください", height=80, key=tab + "_absent_input")
     absents = [x.strip() for x in absent_input.split("\n") if x.strip()]
-    available = [i for i, name in enumerate(names) if name not in absents]
 
-    # 残り指名可能人数（欠席者除く & 指名済み除く）
     pool = st.session_state.get(tab + "_pool", [])
     used = st.session_state.get(tab + "_used", [])
-    remaining_set = {i for i in pool if i in available and i not in used}
-    st.markdown(f"🔢 **残り指名可能人数：{len(remaining_set)} 人**")
+    available = [i for i, name in enumerate(names) if name not in absents]
+
+    # 残り指名可能数をpoolの中で未指名かつ欠席でない分でカウント
+    remaining_count = len([i for i in pool if i not in used and i in available])
+    st.markdown(f"🔢 **残り指名可能人数（pool内）: {remaining_count} 人**")
 
     st.subheader("\U0001F3AF 指名！")
     if st.button("\U0001F446 指名する", key=tab + "_pick"):
@@ -184,7 +181,6 @@ def run_app():
                 unsafe_allow_html=True
             )
 
-    used = st.session_state.get(tab + "_used", [])
     df = pd.DataFrame([
         {
             "番号": i + 1,
@@ -212,9 +208,9 @@ def run_app():
 
         st.download_button("⬇️ 履歴ダウンロード(必ずダウンロードしてからサイトを離れてください)", df.to_csv(index=False), file_name=f"{tab}_履歴.csv")
 
-    if tab + "_pool" in st.session_state and st.session_state[tab + "_pool"]:
+    if pool:
         st.subheader("📈 年間指名回数の統計")
-        counts = Counter(st.session_state[tab + "_pool"])
+        counts = Counter(pool)
         count_list = [counts.get(i, 0) for i in range(len(names))]
         show_stats = st.selectbox("表示する統計を選択してください",
                                   ["全員の指名回数を一覧表示", "特定の番号の指名回数を見る"],
