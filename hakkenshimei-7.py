@@ -224,9 +224,11 @@ def run_app():
     ])
 
     if len(df) > 0:
-        st.subheader("📋 指名履歴（指名された人のみ）")
-        used_df = df[df["指名済"] == True]
-        st.dataframe(used_df[["番号", "名前"]])
+        st.subheader("📋 指名履歴（指名された順）")
+        ordered_df = pd.DataFrame([
+            {"番号": i + 1, "名前": names[i]} for i in used
+        ])
+        st.dataframe(ordered_df)
 
         if st.session_state.auto_save:
             df.to_csv(f"history/{tab}_最新.csv", index=False)
