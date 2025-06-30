@@ -1,4 +1,4 @@
-import streamlit as st
+#import streamlit as st
 import pandas as pd
 import os
 import random
@@ -232,7 +232,10 @@ def run_app():
 
     if len(df) > 0:
         st.subheader("📋 指名履歴")
-        st.dataframe(df[["番号", "名前", "指名済"]])
+
+        # ⬇️ 指名された人だけを表示（指名済 == True）
+        used_df = df[df["指名済"] == True]
+        st.dataframe(used_df[["番号", "名前"]])
 
         if st.session_state.auto_save:
             df.to_csv(f"history/{tab}_最新.csv", index=False)
