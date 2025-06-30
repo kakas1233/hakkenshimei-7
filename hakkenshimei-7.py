@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import os
@@ -6,7 +7,7 @@ import math
 from collections import Counter
 from datetime import timedelta, timezone
 
-    # タイムゾーン設定（必要なら）
+# タイムゾーン設定（必要なら）
 JST = timezone(timedelta(hours=9))
 
 # 履歴保存ディレクトリ
@@ -80,7 +81,6 @@ def find_best_seed_and_method(k, l, n):
 def run_app():
     st.title("🎲 指名アプリ（完全版）")
 
-    # --- 初期化 ---
     if "class_list" not in st.session_state:
         st.session_state.class_list = ["クラスA", "クラスB", "クラスC"]
     if "auto_save" not in st.session_state:
@@ -90,12 +90,10 @@ def run_app():
     if "loading" not in st.session_state:
         st.session_state.loading = False
 
-    # --- サイドバー 設定 ---
     with st.sidebar.expander("🔧 設定"):
         st.session_state.sound_on = st.checkbox("🔊 指名時に音を鳴らす", value=st.session_state.sound_on)
         st.session_state.auto_save = st.checkbox("💾 自動で履歴を保存する", value=st.session_state.auto_save)
 
-    # --- クラス設定 ---
     with st.sidebar.expander("⚙️ クラス設定"):
         selected = st.selectbox("📝 クラス名を変更または削除", st.session_state.class_list, key="class_edit")
         new_name = st.text_input("✏️ 新しいクラス名", key="rename_input")
@@ -118,26 +116,20 @@ def run_app():
         if st.button("クラス追加") and new_class and new_class not in st.session_state.class_list:
             st.session_state.class_list.append(new_class)
 
-    # --- クラス選択 ---
     tab = st.sidebar.selectbox("📚 クラス選択", st.session_state.class_list)
 
-    # 履歴CSV手動読み込み ---
     st.sidebar.markdown("### 📤 履歴CSVを手動で読み込み")
     uploaded_csv = st.sidebar.file_uploader("CSVを選択", type="csv")
     if uploaded_csv:
         try:
             df = pd.read_csv(uploaded_csv)
-            # 復元
             st.session_state[tab + "_used"] = [int(row["番号"]) - 1 for _, row in df.iterrows()]
             st.session_state[tab + "_names"] = df["名前"].tolist()
-            st.session_state[tab + "_name_input"] = "\n".join(df["名前"].tolist())  # ← 追加
             st.session_state.sound_on = bool(df["音ON"].iloc[0])
             st.session_state.auto_save = bool(df["自動保存ON"].iloc[0])
             st.session_state[tab + "k"] = int(df["k"].iloc[0])
             st.session_state[tab + "l"] = int(df["l"].iloc[0])
-            st.session_state[tab + "n"] = len(df)  # ← nの整合性も取る
-
-            # 乱数プール再生成
+            st.session_state[tab + "n"] = int(df["n"].iloc[0])
             _, _, _, pool = find_best_seed_and_method(
                 st.session_state[tab + "k"],
                 st.session_state[tab + "l"],
@@ -147,15 +139,13 @@ def run_app():
             st.toast("✅ 手動で履歴CSVを読み込みました！")
         except Exception as e:
             st.error(f"読み込みエラー: {e}")
-        
-    # --- メイン画面 ---
+
     st.header(f"📋 {tab} の設定")
 
     k = st.number_input("年間授業回数", value=st.session_state.get(tab + "k", 30), min_value=1, key=tab + "k")
     l = st.number_input("授業1回あたりの平均指名人数", value=st.session_state.get(tab + "l", 5), min_value=1, key=tab + "l")
     n = st.number_input("クラス人数", value=st.session_state.get(tab + "n", 40), min_value=1, key=tab + "n")
 
-    # 名前入力（自動補完含む）
     name_input = st.text_area("名前を改行区切りで入力（足りない分は自動補完）", height=120, key=tab + "_name_input")
     raw = [x.strip() for x in name_input.split("\n") if x.strip()]
     if len(raw) < n:
@@ -164,13 +154,11 @@ def run_app():
         raw = raw[:n]
     names = [x.strip() for x in raw]
     st.session_state[tab + "_names"] = names
-
     st.write("👥 メンバー:", [f"{i+1} : {name}" for i, name in enumerate(names)])
 
     if f"{tab}_used" not in st.session_state:
         st.session_state[tab + "_used"] = []
 
-    # 指名準備ボタン＋「準備中です…」表示
     if st.button("📊 指名する準備を整える！", key=tab + "_gen"):
         st.session_state.loading = True
         with st.spinner("準備中です…乱数生成と偏差計算をしています。少しお待ちください。"):
@@ -183,20 +171,17 @@ def run_app():
             st.session_state[tab + "_seed"] = seed
             st.session_state[tab + "_var"] = var
             st.session_state.loading = False
-
             st.success(f"✅ 使用法: {method}（seed={seed}、偏差={std:.2f}）")
             st.markdown(
                 f"<div style='font-size:20px;color:#1e90ff'>1人あたりの指名回数の範囲: 約 {exp - std:.2f} ～ {exp + std:.2f} 回</div>",
                 unsafe_allow_html=True
             )
 
-    # 欠席者処理
     st.subheader("🚫 欠席者（指名除外）")
     absent_input = st.text_area("欠席者の名前（改行区切り）", height=80, key=tab + "_absent_input")
     absents = [x.strip() for x in absent_input.split("\n") if x.strip()]
     available = [i for i, name in enumerate(names) if name not in absents]
 
-    # 🎯 指名部分の変更（ここが今回の要望）
     st.subheader("🎯 指名！")
     if st.button("👆 指名する", key=tab + "_pick"):
         pool = st.session_state.get(tab + "_pool", [])
@@ -207,47 +192,32 @@ def run_app():
         else:
             sel = random.choice(remaining)
             st.session_state[tab + "_used"].append(sel)
-            # 👇 指名結果を大きく強調して表示
             st.markdown(
                 f"<div style='font-size:40px; text-align:center; color:#ff4500;'>🎉 {sel + 1}番: {names[sel]} 🎉</div>",
                 unsafe_allow_html=True
             )
 
-        # 指名履歴データフレーム作成
     used = st.session_state.get(tab + "_used", [])
-    
-    # 表示用（番号と名前のみ）
-    df_display = pd.DataFrame([
-        {"番号": idx + 1, "名前": names[idx]}
-        for idx in used
-    ])
-    
-    # 保存・ダウンロード用（追加情報を含む）
-    df_save = pd.DataFrame([
-        {"番号": idx + 1, "名前": names[idx],
-         "音ON": st.session_state.sound_on,
-         "自動保存ON": st.session_state.auto_save,
-         "クラス名": tab,
+    df = pd.DataFrame([
+        {"番号": idx + 1, "名前": names[idx], "音ON": st.session_state.sound_on,
+         "自動保存ON": st.session_state.auto_save, "クラス名": tab,
          "k": k, "l": l, "n": n}
         for idx in used
     ])
 
-    if len(df_display) > 0:
+    if len(df) > 0:
         st.subheader("📋 指名履歴")
-        st.dataframe(df_display)
+        st.dataframe(df[["番号", "名前"]])
 
         if st.session_state.auto_save:
-            df_save.to_csv(f"history/{tab}_最新.csv", index=False)
+            df.to_csv(f"history/{tab}_最新.csv", index=False)
 
-        st.download_button("⬇️ CSVダウンロード", df_save.to_csv(index=False), file_name=f"{tab}_履歴.csv")
-        
-    # --- 乱数生成後の指名回数の統計表示 ---
+        st.download_button("⬇️ CSVダウンロード", df.to_csv(index=False), file_name=f"{tab}_履歴.csv")
+
     if tab + "_pool" in st.session_state and st.session_state[tab + "_pool"]:
         st.subheader("📈 指名回数の統計")
         counts = Counter(st.session_state[tab + "_pool"])
-        # 指名回数を人数順にまとめる
         count_list = [counts.get(i, 0) for i in range(len(names))]
-
         show_stats = st.selectbox("表示する統計を選択してください",
                                   ["全員の指名回数を一覧表示", "特定の番号の指名回数を見る"],
                                   key=tab + "_stats_select")
@@ -259,10 +229,9 @@ def run_app():
                 "指名回数": count_list
             })
             st.dataframe(stats_df)
-
-        else:  # 特定番号
+        else:
             num = st.number_input("番号を入力", min_value=1, max_value=len(names), step=1, key=tab + "_stats_num")
             st.write(f"番号 {num} の {names[num-1]} さんは {count_list[num-1]} 回指名される見込みです。")
 
 if __name__ == "__main__":
-    run_app()#
+    run_app()
