@@ -95,13 +95,23 @@ def run_app():
             st.session_state["mp3_data"] = uploaded_audio.read()
 
     with st.sidebar.expander("📝 クラス管理"):
-        new_class = st.text_input("➕ クラス追加")
-        if st.button("追加"):
-            if new_class and new_class not in st.session_state.class_list:
-                st.session_state.class_list.append(new_class)
+    updated_list = []
+    for i, cname in enumerate(st.session_state.class_list):
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            new_name = st.text_input(f"クラス名 {i+1}", value=cname, key=f"class_{i}")
+            updated_list.append(new_name)
+        with col2:
+            if st.button("❌", key=f"delete_{i}"):
+                updated_list.pop()  # skip adding this one
+                continue
+    st.session_state.class_list = updated_list
 
-    tab = st.sidebar.selectbox("📚 クラス選択", st.session_state.class_list)
-
+    new_class = st.text_input("➕ 新しいクラス名")
+    if st.button("追加"):
+        if new_class and new_class not in st.session_state.class_list:
+            st.session_state.class_list.append(new_class)
+            
     st.header(f"📋 {tab} の設定")
 
     uploaded_history = st.file_uploader("📂 履歴CSVをアップロード", type=["csv"], key=tab+"_upload_csv")
