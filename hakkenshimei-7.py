@@ -27,7 +27,8 @@ def mersenne_twister(seed, count):
 
 def middle_square(seed, count):
     n_digits = len(str(seed))
-    value = seed; result = []
+    value = seed
+    result = []
     for _ in range(count):
         squared = value ** 2
         squared_str = str(squared).zfill(2 * n_digits)
@@ -38,8 +39,11 @@ def middle_square(seed, count):
     return result
 
 def lcg(seed, count):
-    m = 2**32; a = 1664525; c = 1013904223
-    result = []; x = seed
+    m = 2**32
+    a = 1664525
+    c = 1013904223
+    result = []
+    x = seed
     for _ in range(count):
         x = (a * x + c) % m
         result.append(x)
@@ -123,6 +127,14 @@ def run_app():
             st.session_state[tab + "l"] = l
             st.session_state[tab + "n"] = n
             st.session_state[tab + "_name_input"] = "\n".join(names)
+
+            method, seed, var, pool = find_best_seed_and_method(k, l, len(names))
+            random.shuffle(pool)
+            st.session_state[tab + "_pool"] = pool
+            st.session_state[tab + "_method"] = method
+            st.session_state[tab + "_seed"] = seed
+            st.session_state[tab + "_var"] = var
+
             st.success("📥 履歴CSVから復元しました")
         except Exception as e:
             st.error(f"読み込み失敗: {e}")
