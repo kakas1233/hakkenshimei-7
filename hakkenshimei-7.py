@@ -6,6 +6,7 @@ import math
 from collections import Counter
 from datetime import timedelta, timezone
 import io
+import base64
 
 JST = timezone(timedelta(hours=9))
 os.makedirs("history", exist_ok=True)
@@ -196,7 +197,14 @@ def run_app():
             st.session_state[tab + "_used"].append(sel)
 
             if st.session_state.sound_on and st.session_state.get("mp3_data"):
-                st.audio(st.session_state["mp3_data"], format="audio/mp3", start_time=0)
+                b64_mp3 = base64.b64encode(st.session_state["mp3_data"]).decode()
+                audio_html = f"""
+                    <audio autoplay>
+                        <source src="data:audio/mp3;base64,{b64_mp3}" type="audio/mp3">
+                        あなたのブラウザは audio タグに対応していません。
+                    </audio>
+                """
+                st.markdown(audio_html, unsafe_allow_html=True)
 
             st.markdown(
                 f"<div style='font-size:40px; text-align:center; color:green; font-weight:bold;'>🎉 {sel + 1}番: {names[sel]} 🎉</div>",
