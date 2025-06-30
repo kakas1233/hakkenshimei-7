@@ -18,7 +18,7 @@ class Xorshift:
         self.state = seed if seed != 0 else 1
     def next(self):
         x = self.state
-        x ^= (x << 13) & 0xFFFFFFFF
+        x ^= (x << 13) & 0xFFFFFFFF.
         x ^= (x >> 17)
         x ^= (x << 5) & 0xFFFFFFFF
         self.state = x & 0xFFFFFFFF
@@ -186,6 +186,7 @@ def run_app():
         st.session_state.loading = True
         with st.spinner("準備中です。少しお待ちください。"):
             method, seed, var, pool = find_best_seed_and_method(k, l, len(names))
+            random.shuffle(pool)  # ← これを追加するだけ
             std = math.sqrt(var)
             exp = (k * l) / len(names)
             st.session_state[tab + "_pool"] = pool
