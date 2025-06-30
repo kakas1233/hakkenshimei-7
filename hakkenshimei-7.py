@@ -6,7 +6,7 @@ import math
 from collections import Counter
 from datetime import timedelta, timezone
 
-# タイムゾーン設定（必要なら）
+# タイムゾーン設定
 JST = timezone(timedelta(hours=9))
 
 # 履歴保存ディレクトリ
@@ -92,11 +92,9 @@ def run_app():
     with st.sidebar.expander("🔧 設定"):
         st.session_state.sound_on = st.checkbox("🔊 指名時に音を鳴らす", value=st.session_state.sound_on)
         st.session_state.auto_save = st.checkbox("💾 自動で履歴を保存する", value=st.session_state.auto_save)
-
-    with st.sidebar.expander("🔊 音声ファイル設定（任意・mp3）"):
-        uploaded_mp3 = st.file_uploader("指名時に再生するmp3ファイルを選択", type=["mp3"])
-        if uploaded_mp3:
-            st.session_state["mp3_data"] = uploaded_mp3.read()
+        uploaded_audio = st.file_uploader("🎵 mp3ファイルをアップロード（任意）", type=["mp3"])
+        if uploaded_audio:
+            st.session_state["mp3_data"] = uploaded_audio.read()
 
     with st.sidebar.expander("⚙️ クラス設定"):
         selected = st.selectbox("📝 クラス名を変更または削除", st.session_state.class_list, key="class_edit")
@@ -165,15 +163,13 @@ def run_app():
                 unsafe_allow_html=True
             )
 
-    if st.button("📂 履歴を読み込む", key=tab + "_load_history"):
-        path = f"history/{tab}_最新.csv"
-        if os.path.exists(path):
-            hist_df = pd.read_csv(path)
-            st.session_state[tab + "_names"] = hist_df["名前"].tolist()
-            st.session_state[tab + "_used"] = [i for i, row in hist_df.iterrows() if row["指名済"]]
-            st.success("✅ 履歴を読み込みました。")
-        else:
-            st.warning("履歴ファイルが存在しません。")
+    if st.button("📂 履歴を読み込む", key=tab + "_load"):
+        try:
+            df = pd.read_csv(f"history/{tab}_最新.csv")
+            st.session_state[tab + "_used"] = [i for i, row in df.iterrows() if row["指名済"]]
+            st.success("📥 履歴を読み込みました")
+        except Exception as e:
+            st.error(f"読み込みに失敗しました: {e}")
 
     st.subheader("🚫 欠席者（指名除外）")
     absent_input = st.text_area("欠席者の名前（改行区切り）※上で入力した名前と同じ表記をしてください", height=80, key=tab + "_absent_input")
@@ -189,10 +185,10 @@ def run_app():
         if not remaining:
             st.warning("⚠️ 指名できる人がいません（全員指名済 or 欠席）")
         else:
-            sel = remaining[0]
+            sel = random.choice(remaining)
+
             st.session_state[tab + "_used"].append(sel)
 
-            # 🎵 再生
             if st.session_state.sound_on and st.session_state.get("mp3_data"):
                 st.audio(st.session_state["mp3_data"], format="audio/mp3", start_time=0)
 
@@ -206,7 +202,7 @@ def run_app():
     absent_indexes = [i for i, name in enumerate(names) if name in absents]
     counts = Counter(pool)
     absent_count_in_pool = sum(counts.get(i, 0) for i in absent_indexes)
-    remaining_count = len(pool) - absent_count_in_pool - sum(min(counts[i], used.count(i)) for i in set(pool))
+    remaining_count = len(pool) - absent_count_in_pool - len(used)
     st.markdown(f"🔢 **残り指名可能人数: {remaining_count} 人**")
 
     df = pd.DataFrame([
