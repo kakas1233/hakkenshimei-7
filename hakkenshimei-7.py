@@ -76,14 +76,11 @@ def run_app():
 
     if "class_list" not in st.session_state:
         st.session_state.class_list = ["クラスA"]
-    if "auto_save" not in st.session_state:
-        st.session_state.auto_save = True
     if "sound_on" not in st.session_state:
         st.session_state.sound_on = False
 
     with st.sidebar.expander("🔧 設定"):
         st.session_state.sound_on = st.checkbox("🔊 指名時に音を鳴らす", value=st.session_state.sound_on)
-        st.session_state.auto_save = st.checkbox("💾 自動で履歴を保存する", value=st.session_state.auto_save)
         uploaded_audio = st.file_uploader("🎵 mp3ファイルをアップロード（任意）", type=["mp3"])
         if uploaded_audio:
             st.session_state["mp3_data"] = uploaded_audio.read()
@@ -194,27 +191,6 @@ def run_app():
                 unsafe_allow_html=True
             )
 
-            # ✅ 指名直後の保存と通知
-            df = pd.DataFrame([
-                {
-                    "番号": i + 1,
-                    "名前": names[i],
-                    "指名済": i in st.session_state[tab + "_used"],
-                    "音ON": st.session_state.sound_on,
-                    "自動保存ON": st.session_state.auto_save,
-                    "クラス名": tab,
-                    "k": k,
-                    "l": l,
-                    "n": n
-                }
-                for i in range(len(names))
-            ])
-            if st.session_state.auto_save:
-                csv_bytes = df.to_csv(index=False).encode("utf-8")
-                with open(f"history/{tab}_最新.csv", "wb") as f:
-                    f.write(csv_bytes)
-                st.toast("💾 履歴を保存しました")
-
     pool = st.session_state.get(tab + "_pool", [])
     used = st.session_state.get(tab + "_used", [])
     counts = Counter(pool)
@@ -230,7 +206,6 @@ def run_app():
             "名前": names[i],
             "指名済": i in used,
             "音ON": st.session_state.sound_on,
-            "自動保存ON": st.session_state.auto_save,
             "クラス名": tab,
             "k": k,
             "l": l,
@@ -245,11 +220,6 @@ def run_app():
             {"番号": i + 1, "名前": names[i]} for i in used
         ])
         st.dataframe(ordered_df)
-
-        if st.session_state.auto_save:
-            csv_bytes = df.to_csv(index=False).encode("utf-8")
-            with open(f"history/{tab}_最新.csv", "wb") as f:
-                f.write(csv_bytes)
 
         csv_buffer = io.StringIO()
         df.to_csv(csv_buffer, index=False)
