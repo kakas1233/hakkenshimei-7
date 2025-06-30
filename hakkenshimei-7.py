@@ -136,6 +136,8 @@ def run_app():
     names = raw
     st.session_state[tab + "_names"] = names
 
+    st.write("👥 メンバー:", [f"{i+1} : {name}" for i, name in enumerate(names)])
+
     if f"{tab}_used" not in st.session_state:
         st.session_state[tab + "_used"] = []
 
@@ -163,11 +165,10 @@ def run_app():
     absents = [x.strip() for x in absent_input.split("\n") if x.strip()]
     available = [i for i, name in enumerate(names) if name not in absents]
 
-    # 残り指名可能人数（ユニーク番号でカウント）
+    # 残り指名可能人数（欠席者除く & 指名済み除く）
     pool = st.session_state.get(tab + "_pool", [])
     used = st.session_state.get(tab + "_used", [])
-    unique_pool = set(pool)
-    remaining_set = {i for i in unique_pool if i not in used and i in available}
+    remaining_set = {i for i in pool if i in available and i not in used}
     st.markdown(f"🔢 **残り指名可能人数：{len(remaining_set)} 人**")
 
     st.subheader("\U0001F3AF 指名！")
