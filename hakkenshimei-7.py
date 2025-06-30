@@ -7,6 +7,7 @@ from collections import Counter
 from datetime import timedelta, timezone
 import io
 import base64
+import uuid  # 追加
 
 JST = timezone(timedelta(hours=9))
 os.makedirs("history", exist_ok=True)
@@ -198,8 +199,9 @@ def run_app():
 
             if st.session_state.sound_on and st.session_state.get("mp3_data"):
                 b64_mp3 = base64.b64encode(st.session_state["mp3_data"]).decode()
+                unique_id = uuid.uuid4()  # ランダムIDで毎回違うタグに
                 audio_html = f"""
-                    <audio autoplay>
+                    <audio autoplay key="{unique_id}">
                         <source src="data:audio/mp3;base64,{b64_mp3}" type="audio/mp3">
                         あなたのブラウザは audio タグに対応していません。
                     </audio>
