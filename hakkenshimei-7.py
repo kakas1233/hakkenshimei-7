@@ -6,16 +6,11 @@ import math
 from collections import Counter
 from datetime import timedelta, timezone
 
-# タイムゾーン設定
 JST = timezone(timedelta(hours=9))
-
-# 履歴保存ディレクトリ
 os.makedirs("history", exist_ok=True)
 
-# 乱数生成法定義
 class Xorshift:
-    def __init__(self, seed):
-        self.state = seed if seed != 0 else 1
+    def __init__(self, seed): self.state = seed if seed != 0 else 1
     def next(self):
         x = self.state
         x ^= (x << 13) & 0xFFFFFFFF
@@ -23,8 +18,7 @@ class Xorshift:
         x ^= (x << 5) & 0xFFFFFFFF
         self.state = x & 0xFFFFFFFF
         return self.state
-    def generate(self, count):
-        return [self.next() for _ in range(count)]
+    def generate(self, count): return [self.next() for _ in range(count)]
 
 def mersenne_twister(seed, count):
     random.seed(seed)
@@ -32,8 +26,7 @@ def mersenne_twister(seed, count):
 
 def middle_square(seed, count):
     n_digits = len(str(seed))
-    value = seed
-    result = []
+    value = seed; result = []
     for _ in range(count):
         squared = value ** 2
         squared_str = str(squared).zfill(2 * n_digits)
@@ -95,23 +88,23 @@ def run_app():
             st.session_state["mp3_data"] = uploaded_audio.read()
 
     with st.sidebar.expander("📝 クラス管理"):
-    updated_list = []
-    for i, cname in enumerate(st.session_state.class_list):
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            new_name = st.text_input(f"クラス名 {i+1}", value=cname, key=f"class_{i}")
-            updated_list.append(new_name)
-        with col2:
-            if st.button("❌", key=f"delete_{i}"):
-                updated_list.pop()  # skip adding this one
-                continue
-    st.session_state.class_list = updated_list
+        updated_list = []
+        for i, cname in enumerate(st.session_state.class_list):
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                new_name = st.text_input(f"クラス名 {i+1}", value=cname, key=f"class_{i}")
+                updated_list.append(new_name)
+            with col2:
+                if st.button("❌", key=f"delete_{i}"):
+                    continue
+        st.session_state.class_list = updated_list
 
-    new_class = st.text_input("➕ 新しいクラス名")
-    if st.button("追加"):
-        if new_class and new_class not in st.session_state.class_list:
-            st.session_state.class_list.append(new_class)
-            
+        new_class = st.text_input("➕ 新しいクラス名")
+        if st.button("追加"):
+            if new_class and new_class not in st.session_state.class_list:
+                st.session_state.class_list.append(new_class)
+
+    tab = st.sidebar.selectbox("📚 クラス選択", st.session_state.class_list)
     st.header(f"📋 {tab} の設定")
 
     uploaded_history = st.file_uploader("📂 履歴CSVをアップロード", type=["csv"], key=tab+"_upload_csv")
