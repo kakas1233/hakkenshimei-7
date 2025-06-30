@@ -136,6 +136,8 @@ def run_app():
     names = raw
     st.session_state[tab + "_names"] = names
 
+    st.write("👥 メンバー:", [f"{i+1} : {name}" for i, name in enumerate(names)])
+
     if f"{tab}_used" not in st.session_state:
         st.session_state[tab + "_used"] = []
 
@@ -144,7 +146,7 @@ def run_app():
         with st.spinner("準備中です。少しお待ちください。"):
             method, seed, var, pool = find_best_seed_and_method(k, l, len(names))
             random.shuffle(pool)  # ← 順番だけランダム化！
-            std = math.sqrt(var)
+            std = math.sqrt(var)  # 標準偏差を復活
             exp = (k * l) / len(names)
             st.session_state[tab + "_pool"] = pool
             st.session_state[tab + "_used"] = []
@@ -164,10 +166,15 @@ def run_app():
     available = [i for i, name in enumerate(names) if name not in absents]
 
     st.subheader("\U0001F3AF 指名！")
+
+    pool = st.session_state.get(tab + "_pool", [])
+    used = st.session_state.get(tab + "_used", [])
+    remaining = [i for i in pool if i not in used and i in available]
+
+    # 残り指名可能人数表示
+    st.markdown(f"🧮 **残り指名可能人数: {len(remaining)} 人**")
+
     if st.button("\U0001F446 指名する", key=tab + "_pick"):
-        pool = st.session_state.get(tab + "_pool", [])
-        used = st.session_state.get(tab + "_used", [])
-        remaining = [i for i in pool if i not in used and i in available]
         if not remaining:
             st.warning("⚠️ 指名できる人がいません（全員指名済 or 欠席）")
         else:
