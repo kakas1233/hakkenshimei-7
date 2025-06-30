@@ -6,9 +6,13 @@ import math
 from collections import Counter
 from datetime import timedelta, timezone
 
+# タイムゾーン設定（必要なら）
 JST = timezone(timedelta(hours=9))
+
+# 履歴保存ディレクトリ
 os.makedirs("history", exist_ok=True)
 
+# 乱数生成法定義
 class Xorshift:
     def __init__(self, seed):
         self.state = seed if seed != 0 else 1
@@ -113,45 +117,6 @@ def run_app():
 
     tab = st.sidebar.selectbox("📚 クラス選択", st.session_state.class_list)
 
-    st.sidebar.markdown("### 📤 履歴の読み込み")
-    uploaded_csv = st.sidebar.file_uploader("CSV形式のファイルを選択", type="csv")
-    if uploaded_csv:
-        try:
-            df = pd.read_csv(uploaded_csv)
-            names_from_csv = df["名前"].tolist()
-            expected_n = int(df["n"].iloc[0])
-            if len(names_from_csv) < expected_n:
-                names_from_csv += [f"名前{i+1}" for i in range(len(names_from_csv), expected_n)]
-            elif len(names_from_csv) > expected_n:
-                names_from_csv = names_from_csv[:expected_n]
-
-            st.session_state[tab + "_names"] = names_from_csv
-            st.session_state[tab + "_name_input"] = "\n".join(names_from_csv)
-
-            if "指名済" in df.columns:
-                st.session_state[tab + "_used"] = [i for i, row in df.iterrows() if row["指名済"]]
-            else:
-                st.session_state[tab + "_used"] = [int(row["番号"]) - 1 for _, row in df.iterrows()]
-
-            st.session_state.sound_on = bool(df["音ON"].iloc[0])
-            st.session_state.auto_save = bool(df["自動保存ON"].iloc[0])
-            st.session_state[tab + "k"] = int(df["k"].iloc[0])
-            st.session_state[tab + "l"] = int(df["l"].iloc[0])
-            st.session_state[tab + "n"] = expected_n
-
-            _, _, _, pool = find_best_seed_and_method(
-                st.session_state[tab + "k"],
-                st.session_state[tab + "l"],
-                st.session_state[tab + "n"]
-            )
-            st.session_state[tab + "_pool"] = pool
-
-            st.toast("✅ 履歴を読み込みました！")
-            st.experimental_rerun()
-
-        except Exception as e:
-            st.error(f"読み込みエラー: {e}")
-
     st.header(f"📋 {tab} の設定")
 
     k = st.number_input("年間授業回数", value=st.session_state.get(tab + "k", 30), min_value=1, key=tab + "k")
@@ -180,7 +145,7 @@ def run_app():
         st.session_state.loading = True
         with st.spinner("準備中です。少しお待ちください。"):
             method, seed, var, pool = find_best_seed_and_method(k, l, len(names))
-            random.shuffle(pool)
+            random.shuffle(pool)  # 順番だけランダム化
             std = math.sqrt(var)
             exp = (k * l) / len(names)
             st.session_state[tab + "_pool"] = pool
@@ -201,36 +166,34 @@ def run_app():
     available = [i for i, name in enumerate(names) if name not in absents]
 
     st.subheader("🎯 指名！")
-
-    pool = st.session_state.get(tab + "_pool", [])
-    used = st.session_state.get(tab + "_used", [])
-
-    # ここだけ修正: 残り指名可能人数は
-    # poolにいる欠席者を除いた番号の数からusedで使った数を引く
-    available_count = len(set(pool) & set(available))
-    used_count = len(used)
-    remaining_count = available_count - used_count
-    st.write(f"残り指名可能人数: {remaining_count}人")
-
-    remaining_indices = [i for i in range(len(pool)) if i not in used and pool[i] in available]
-
     if st.button("👆 指名する", key=tab + "_pick"):
-        if not remaining_indices:
-            st.warning("⚠️ 指名できる人がいません（乱数プールをすべて使い切りました）")
+        pool = st.session_state.get(tab + "_pool", [])
+        used = st.session_state.get(tab + "_used", [])
+        remaining = [i for i in pool if i not in used and i in available]
+        if not remaining:
+            st.warning("⚠️ 指名できる人がいません（全員指名済 or 欠席）")
         else:
-            next_index = remaining_indices[0]
-            sel = pool[next_index]
-            st.session_state[tab + "_used"].append(next_index)
+            sel = remaining[0]  # シャッフル済みの順に
+            st.session_state[tab + "_used"].append(sel)
             st.markdown(
-                f"<div style='font-size:40px; text-align:center; font-weight:bold; color:green;'>🎉 {sel + 1}番: {names[sel]} 🎉</div>",
+                f"<div style='font-size:40px; text-align:center; color:green;'>🎉 {sel + 1}番: {names[sel]} 🎉</div>",
                 unsafe_allow_html=True
             )
+
+    # ★ 残り指名可能人数計算・表示部分 ★
+    pool = st.session_state.get(tab + "_pool", [])
+    used = st.session_state.get(tab + "_used", [])
+    absent_indexes = [i for i, name in enumerate(names) if name in absents]
+    counts = Counter(pool)
+    absent_count_in_pool = sum(counts.get(i, 0) for i in absent_indexes)
+    remaining_count = len(pool) - absent_count_in_pool - len(used)
+    st.markdown(f"🔢 **残り指名可能人数: {remaining_count} 人**")
 
     df = pd.DataFrame([
         {
             "番号": i + 1,
             "名前": names[i],
-            "指名済": any(pool[j] == i for j in used),
+            "指名済": i in used,
             "音ON": st.session_state.sound_on,
             "自動保存ON": st.session_state.auto_save,
             "クラス名": tab,
@@ -244,7 +207,7 @@ def run_app():
     if len(df) > 0:
         st.subheader("📋 指名履歴（指名された順）")
         ordered_df = pd.DataFrame([
-            {"番号": pool[i] + 1, "名前": names[pool[i]]} for i in used
+            {"番号": i + 1, "名前": names[i]} for i in used
         ])
         st.dataframe(ordered_df)
 
