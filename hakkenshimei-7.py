@@ -136,8 +136,6 @@ def run_app():
     names = raw
     st.session_state[tab + "_names"] = names
 
-    st.write("👥 メンバー:", [f"{i+1} : {name}" for i, name in enumerate(names)])
-
     if f"{tab}_used" not in st.session_state:
         st.session_state[tab + "_used"] = []
 
@@ -145,7 +143,7 @@ def run_app():
         st.session_state.loading = True
         with st.spinner("準備中です。少しお待ちください。"):
             method, seed, var, pool = find_best_seed_and_method(k, l, len(names))
-            random.shuffle(pool)  # 順番だけランダム化
+            random.shuffle(pool)  # 順番だけランダム化！
             std = math.sqrt(var)
             exp = (k * l) / len(names)
             st.session_state[tab + "_pool"] = pool
@@ -165,23 +163,21 @@ def run_app():
     absents = [x.strip() for x in absent_input.split("\n") if x.strip()]
     available = [i for i, name in enumerate(names) if name not in absents]
 
-    remaining = []
+    # 残り指名可能人数（ユニーク番号でカウント）
     pool = st.session_state.get(tab + "_pool", [])
     used = st.session_state.get(tab + "_used", [])
-    # 残り指名可能者
-    remaining = [i for i in pool if i not in used and i in available]
-
-    # 残り人数表示
-    st.markdown(f"🔢 **残り指名可能人数：{len(remaining)} 人**")
+    unique_pool = set(pool)
+    remaining_set = {i for i in unique_pool if i not in used and i in available}
+    st.markdown(f"🔢 **残り指名可能人数：{len(remaining_set)} 人**")
 
     st.subheader("\U0001F3AF 指名！")
     if st.button("\U0001F446 指名する", key=tab + "_pick"):
+        remaining = [i for i in pool if i not in used and i in available]
         if not remaining:
             st.warning("⚠️ 指名できる人がいません（全員指名済 or 欠席）")
         else:
             sel = remaining[0]  # シャッフル済みなので順に出せばOK
-            if sel not in st.session_state[tab + "_used"]:
-                st.session_state[tab + "_used"].append(sel)
+            st.session_state[tab + "_used"].append(sel)
             st.markdown(
                 f"<div style='font-size:40px; text-align:center; color:green;'>🎉 {sel + 1}番: {names[sel]} 🎉</div>",
                 unsafe_allow_html=True
