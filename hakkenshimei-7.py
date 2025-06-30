@@ -6,11 +6,13 @@ import math
 from collections import Counter
 from datetime import timedelta, timezone
 
-# タイムゾーン設定
+# タイムゾーン設定（必要なら）
 JST = timezone(timedelta(hours=9))
+
+# 履歴保存ディレクトリ
 os.makedirs("history", exist_ok=True)
 
-# 乱数生成法
+# 乱数生成法定義
 class Xorshift:
     def __init__(self, seed):
         self.state = seed if seed != 0 else 1
@@ -76,7 +78,7 @@ def find_best_seed_and_method(k, l, n):
     return best[1], best[2], best[0], best[3]
 
 def run_app():
-    st.title("🎲 指名アプリ")
+    st.title("\U0001F3B2 指名アプリ")
 
     if "class_list" not in st.session_state:
         st.session_state.class_list = ["クラスA", "クラスB", "クラスC"]
@@ -87,12 +89,12 @@ def run_app():
     if "loading" not in st.session_state:
         st.session_state.loading = False
 
-    with st.sidebar.expander("🔧 設定"):
-        st.session_state.sound_on = st.checkbox("🔊 指名時に音を鳴らす", value=st.session_state.sound_on)
+    with st.sidebar.expander("\U0001F527 設定"):
+        st.session_state.sound_on = st.checkbox("\U0001F50A 指名時に音を鳴らす", value=st.session_state.sound_on)
         st.session_state.auto_save = st.checkbox("💾 自動で履歴を保存する", value=st.session_state.auto_save)
 
     with st.sidebar.expander("⚙️ クラス設定"):
-        selected = st.selectbox("📝 クラス名を変更または削除", st.session_state.class_list, key="class_edit")
+        selected = st.selectbox("\U0001F4DD クラス名を変更または削除", st.session_state.class_list, key="class_edit")
         new_name = st.text_input("✏️ 新しいクラス名", key="rename_input")
         col1, col2 = st.columns(2)
         with col1:
@@ -113,8 +115,9 @@ def run_app():
         if st.button("クラス追加") and new_class and new_class not in st.session_state.class_list:
             st.session_state.class_list.append(new_class)
 
-    tab = st.sidebar.selectbox("📚 クラス選択", st.session_state.class_list)
+    tab = st.sidebar.selectbox("\U0001F4DA クラス選択", st.session_state.class_list)
 
+    # --- 履歴の読み込み（復元処理） ---
     st.sidebar.markdown("### 📤 履歴の読み込み")
     uploaded_csv = st.sidebar.file_uploader("CSV形式のファイルを選択", type="csv")
     if uploaded_csv:
@@ -155,7 +158,7 @@ def run_app():
         except Exception as e:
             st.error(f"読み込みエラー: {e}")
 
-    st.header(f"📋 {tab} の設定")
+    st.header(f"\U0001F4CB {tab} の設定")
 
     k = st.number_input("年間授業回数", value=st.session_state.get(tab + "k", 30), min_value=1, key=tab + "k")
     l = st.number_input("授業1回あたりの平均指名人数", value=st.session_state.get(tab + "l", 5), min_value=1, key=tab + "l")
@@ -165,6 +168,7 @@ def run_app():
                              height=120,
                              key=tab + "_name_input",
                              value=st.session_state.get(tab + "_name_input", ""))
+
     raw = [x.strip() for x in name_input.split("\n") if x.strip()]
     if len(raw) < n:
         raw += [f"名前{i+1}" for i in range(len(raw), n)]
@@ -172,16 +176,15 @@ def run_app():
         raw = raw[:n]
     names = raw
     st.session_state[tab + "_names"] = names
-    st.write("👥 メンバー:", [f"{i+1} : {name}" for i, name in enumerate(names)])
 
     if f"{tab}_used" not in st.session_state:
         st.session_state[tab + "_used"] = []
 
-    if st.button("📊 指名する準備を整える！", key=tab + "_gen"):
+    if st.button("\U0001F4CA 指名する準備を整える！", key=tab + "_gen"):
         st.session_state.loading = True
         with st.spinner("準備中です。少しお待ちください。"):
             method, seed, var, pool = find_best_seed_and_method(k, l, len(names))
-            random.shuffle(pool)
+            random.shuffle(pool)  # シャッフルして順番をランダム化
             std = math.sqrt(var)
             exp = (k * l) / len(names)
             st.session_state[tab + "_pool"] = pool
@@ -197,29 +200,29 @@ def run_app():
             )
 
     st.subheader("🚫 欠席者（指名除外）")
-    absent_input = st.text_area("欠席者の名前（改行区切り）", height=80, key=tab + "_absent_input")
+    absent_input = st.text_area("欠席者の名前（改行区切り）※上で入力した名前と同じ表記をしてください", height=80, key=tab + "_absent_input")
     absents = [x.strip() for x in absent_input.split("\n") if x.strip()]
     available = [i for i, name in enumerate(names) if name not in absents]
 
-    st.subheader("🎯 指名！")
-    if st.button("👆 指名する", key=tab + "_pick"):
-        pool = st.session_state.get(tab + "_pool", [])
-        used = st.session_state.get(tab + "_used", [])
-        remaining = [i for i in pool if i not in used and i in available]
+    st.write("👥 メンバー:", [f"{i+1} : {name}" for i, name in enumerate(names)])
+
+    st.subheader("\U0001F3AF 指名！")
+
+    pool = st.session_state.get(tab + "_pool", [])
+    used = st.session_state.get(tab + "_used", [])
+    remaining = [i for i in pool if i not in used and i not in absents]
+    st.markdown(f"👥 残り指名可能人数: {len(remaining)}人")
+
+    if st.button("\U0001F446 指名する", key=tab + "_pick"):
         if not remaining:
             st.warning("⚠️ 指名できる人がいません（全員指名済 or 欠席）")
         else:
-            sel = remaining[0]
-            st.session_state[tab + "_used"] = used + [sel]
+            sel = remaining[0]  # シャッフル済みなので順に指名
+            st.session_state[tab + "_used"].append(sel)
             st.markdown(
-                f"<div style='font-size:42px; text-align:center; color:green; font-weight:bold;'>🎉 {sel + 1}番: {names[sel]} 🎉</div>",
+                f"<div style='font-size:40px; font-weight:bold; text-align:center; color:green;'>🎉 {sel + 1}番: {names[sel]} 🎉</div>",
                 unsafe_allow_html=True
             )
-
-    total_pool = st.session_state.get(tab + "_pool", [])
-    used_now = st.session_state.get(tab + "_used", [])
-    remaining_count = len([i for i in total_pool if i in available and i not in used_now])
-    st.info(f"🧮 残り指名可能人数: {remaining_count} 人")
 
     used = st.session_state.get(tab + "_used", [])
     df = pd.DataFrame([
@@ -238,7 +241,7 @@ def run_app():
     ])
 
     if len(df) > 0:
-        st.subheader("📋 指名履歴（指名された順）")
+        st.subheader("\U0001F4CB 指名履歴（指名された順）")
         ordered_df = pd.DataFrame([
             {"番号": i + 1, "名前": names[i]} for i in used
         ])
@@ -247,7 +250,7 @@ def run_app():
         if st.session_state.auto_save:
             df.to_csv(f"history/{tab}_最新.csv", index=False)
 
-        st.download_button("⬇️ 履歴ダウンロード", df.to_csv(index=False), file_name=f"{tab}_履歴.csv")
+        st.download_button("⬇️ 履歴ダウンロード(必ずダウンロードしてからサイトを離れてください)", df.to_csv(index=False), file_name=f"{tab}_履歴.csv")
 
     if tab + "_pool" in st.session_state and st.session_state[tab + "_pool"]:
         st.subheader("📈 年間指名回数の統計")
