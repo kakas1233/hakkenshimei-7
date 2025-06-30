@@ -78,7 +78,7 @@ def find_best_seed_and_method(k, l, n):
     return best[1], best[2], best[0], best[3]
 
 def run_app():
-    st.title("🎲 指名アプリ（完全版）")
+    st.title("🎲 指名アプリ")
 
     if "class_list" not in st.session_state:
         st.session_state.class_list = ["クラスA", "クラスB", "クラスC"]
@@ -184,7 +184,7 @@ def run_app():
 
     if st.button("📊 指名する準備を整える！", key=tab + "_gen"):
         st.session_state.loading = True
-        with st.spinner("準備中です…乱数生成と偏差計算をしています。少しお待ちください。"):
+        with st.spinner("準備中です。少しお待ちください。"):
             method, seed, var, pool = find_best_seed_and_method(k, l, len(names))
             std = math.sqrt(var)
             exp = (k * l) / len(names)
@@ -194,14 +194,14 @@ def run_app():
             st.session_state[tab + "_seed"] = seed
             st.session_state[tab + "_var"] = var
             st.session_state.loading = False
-            st.success(f"✅ 使用法: {method}（seed={seed}、偏差={std:.2f}）")
+            st.success(f"✅ 使用した式: {method}（seed={seed}、標準偏差={std:.2f}）")
             st.markdown(
                 f"<div style='font-size:20px;color:#1e90ff'>1人あたりの指名回数の範囲: 約 {exp - std:.2f} ～ {exp + std:.2f} 回</div>",
                 unsafe_allow_html=True
             )
 
     st.subheader("🚫 欠席者（指名除外）")
-    absent_input = st.text_area("欠席者の名前（改行区切り）", height=80, key=tab + "_absent_input")
+    absent_input = st.text_area("欠席者の名前（改行区切り）※上で入力した名前と同じ表記をしてください", height=80, key=tab + "_absent_input")
     absents = [x.strip() for x in absent_input.split("\n") if x.strip()]
     available = [i for i, name in enumerate(names) if name not in absents]
 
@@ -216,7 +216,7 @@ def run_app():
             sel = random.choice(remaining)
             st.session_state[tab + "_used"].append(sel)
             st.markdown(
-                f"<div style='font-size:40px; text-align:center; color:#ff4500;'>🎉 {sel + 1}番: {names[sel]} 🎉</div>",
+                f"<div style='font-size:40px; text-align:center; color:green;'>🎉 {sel + 1}番: {names[sel]} 🎉</div>",
                 unsafe_allow_html=True
             )
 
