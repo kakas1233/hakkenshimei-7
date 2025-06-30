@@ -223,12 +223,23 @@ def run_app():
             st.session_state[tab + "_used"].append(sel)
             st.markdown(
                 f"<div style='font-size:40px; text-align:center; color:green; font-weight:bold;'>🎉 {sel + 1}番: {names[sel]} 🎉</div>",
-                unsafe_allow_html=True
             )
 
             # 音鳴らし対応（mp3データがある場合）
             if st.session_state.sound_on and st.session_state.get("mp3_data"):
                 st.audio(st.session_state["mp3_data"], format="audio/mp3")
+    
+    if len(df) > 0:
+        st.subheader("📋 指名履歴（指名された順）")
+        ordered_df = pd.DataFrame([
+            {"番号": i + 1, "名前": names[i]} for i in used
+        ])
+        st.dataframe(ordered_df)
+
+        if st.session_state.auto_save:
+            df.to_csv(f"history/{tab}_最新.csv", index=False)
+
+        st.download_button("⬇️ 履歴ダウンロード", df.to_csv(index=False), file_name=f"{tab}_履歴.csv")
 
     if tab + "_pool" in st.session_state and st.session_state[tab + "_pool"]:
         st.subheader("📈 年間指名回数の統計")
