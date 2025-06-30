@@ -6,13 +6,8 @@ import math
 from collections import Counter
 from datetime import timedelta, timezone
 
-# タイムゾーン設定
 JST = timezone(timedelta(hours=9))
-
-# 履歴保存ディレクトリ
 os.makedirs("history", exist_ok=True)
-
-# ========= 乱数生成手法 ==========
 
 class Xorshift:
     def __init__(self, seed):
@@ -78,35 +73,8 @@ def find_best_seed_and_method(k, l, n):
                 best = (var, method, seed, modded)
     return best[1], best[2], best[0], best[3]
 
-# ========= アプリメイン処理 ==========
-
 def run_app():
     st.title("🎲 指名アプリ")
-
-    # 復元処理（最初に処理する）
-    if "復元中" not in st.session_state:
-        st.session_state["復元中"] = False
-    if st.session_state["復元中"]:
-        try:
-            tab = st.session_state["復元クラス"]
-            df = pd.read_csv(f"history/{tab}_最新.csv")
-            names = df["名前"].tolist()
-            k = int(df["k"].iloc[0])
-            l = int(df["l"].iloc[0])
-            n = int(df["n"].iloc[0])
-            used = [i for i, row in df.iterrows() if row["指名済"]]
-            name_text = "\n".join(names)
-
-            st.session_state[tab + "_name_input"] = name_text
-            st.session_state[tab + "k"] = k
-            st.session_state[tab + "l"] = l
-            st.session_state[tab + "n"] = n
-            st.session_state[tab + "_used"] = used
-
-            st.success(f"✅ {tab} の履歴を復元しました")
-        except Exception as e:
-            st.error(f"履歴復元に失敗しました: {e}")
-        st.session_state["復元中"] = False
 
     if "class_list" not in st.session_state:
         st.session_state.class_list = ["クラスA", "クラスB", "クラスC"]
@@ -121,6 +89,23 @@ def run_app():
         uploaded_audio = st.file_uploader("🎵 mp3ファイルをアップロード（任意）", type=["mp3"])
         if uploaded_audio:
             st.session_state["mp3_data"] = uploaded_audio.read()
+
+    with st.sidebar.expander("📂 履歴をアップロード"):
+        uploaded_csv = st.file_uploader("履歴CSVをアップロード", type=["csv"], key="upload_history")
+        if uploaded_csv:
+            try:
+                df = pd.read_csv(uploaded_csv)
+                class_name = df["クラス名"].iloc[0]
+                if class_name not in st.session_state.class_list:
+                    st.session_state.class_list.append(class_name)
+                st.session_state[class_name + "_name_input"] = "\n".join(df["名前"])
+                st.session_state[class_name + "_used"] = [i for i, row in df.iterrows() if row["指名済"]]
+                st.session_state[class_name + "k"] = int(df["k"].iloc[0])
+                st.session_state[class_name + "l"] = int(df["l"].iloc[0])
+                st.session_state[class_name + "n"] = int(df["n"].iloc[0])
+                st.success("📥 履歴を復元しました")
+            except Exception as e:
+                st.error(f"読み込みエラー: {e}")
 
     with st.sidebar.expander("⚙️ クラス設定"):
         selected = st.selectbox("📝 クラス名を変更または削除", st.session_state.class_list, key="class_edit")
@@ -139,7 +124,6 @@ def run_app():
                     st.session_state.class_list.remove(selected)
                 else:
                     st.warning("最低1クラスは必要です。")
-
         new_class = st.text_input("➕ 新しいクラス名を追加", key="add_input")
         if st.button("クラス追加") and new_class and new_class not in st.session_state.class_list:
             st.session_state.class_list.append(new_class)
@@ -165,8 +149,6 @@ def run_app():
     names = raw
     st.session_state[tab + "_names"] = names
 
-    st.write("👥 メンバー:", [f"{i+1} : {name}" for i, name in enumerate(names)])
-
     if f"{tab}_used" not in st.session_state:
         st.session_state[tab + "_used"] = []
 
@@ -187,13 +169,8 @@ def run_app():
                 unsafe_allow_html=True
             )
 
-    if st.button("📂 履歴を読み込む", key=tab + "_load"):
-        st.session_state["復元中"] = True
-        st.session_state["復元クラス"] = tab
-        st.rerun()
-
     st.subheader("🚫 欠席者（指名除外）")
-    absent_input = st.text_area("欠席者の名前（改行区切り）※上で入力した名前と同じ表記をしてください", height=80, key=tab + "_absent_input")
+    absent_input = st.text_area("欠席者の名前（改行区切り）", height=80, key=tab + "_absent_input")
     absents = [x.strip() for x in absent_input.split("\n") if x.strip()]
     available = [i for i, name in enumerate(names) if name not in absents]
 
@@ -220,8 +197,8 @@ def run_app():
     absent_indexes = [i for i, name in enumerate(names) if name in absents]
     counts = Counter(pool)
     absent_count_in_pool = sum(counts.get(i, 0) for i in absent_indexes)
-    remaining_count = len(pool) - absent_count_in_pool - len(used)
-    remaining_count = max(0, remaining_count)
+    used_count = sum(1 for u in used if u not in absent_indexes)
+    remaining_count = max(len(pool) - absent_count_in_pool - used_count, 0)
     st.markdown(f"🔢 **残り指名可能人数: {remaining_count} 人**")
 
     df = pd.DataFrame([
@@ -250,25 +227,6 @@ def run_app():
             df.to_csv(f"history/{tab}_最新.csv", index=False)
 
         st.download_button("⬇️ 履歴ダウンロード", df.to_csv(index=False), file_name=f"{tab}_履歴.csv")
-
-    if tab + "_pool" in st.session_state and st.session_state[tab + "_pool"]:
-        st.subheader("📈 年間指名回数の統計")
-        counts = Counter(st.session_state[tab + "_pool"])
-        count_list = [counts.get(i, 0) for i in range(len(names))]
-        show_stats = st.selectbox("表示する統計を選択してください",
-                                  ["全員の指名回数を一覧表示", "特定の番号の指名回数を見る"],
-                                  key=tab + "_stats_select")
-
-        if show_stats == "全員の指名回数を一覧表示":
-            stats_df = pd.DataFrame({
-                "番号": range(1, len(names) + 1),
-                "名前": names,
-                "指名回数": count_list
-            })
-            st.dataframe(stats_df)
-        else:
-            num = st.number_input("番号を入力", min_value=1, max_value=len(names), step=1, key=tab + "_stats_num")
-            st.write(f"番号 {num} の {names[num-1]} さんは {count_list[num-1]} 回指名される見込みです。")
 
 if __name__ == "__main__":
     run_app()
