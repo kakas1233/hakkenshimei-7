@@ -219,30 +219,30 @@ def run_app():
         for i in range(len(names))
     ])
 
-    if len(df) > 0:
-        st.subheader("📋 指名履歴（指名された順）")
+    st.subheader("📋 指名履歴（指名された順）")
+    if len(used) > 0:
         ordered_df = pd.DataFrame([
             {"番号": i + 1, "名前": names[i]} for i in used
         ])
         st.dataframe(ordered_df)
+    else:
+        st.info("📭 まだ指名履歴がありません。")
 
-        if st.session_state.auto_save:
-            # CSVをバイトストリームで安全に書き込み
-            csv_bytes = df.to_csv(index=False).encode("utf-8")
-            with open(f"history/{tab}_最新.csv", "wb") as f:
-                f.write(csv_bytes)
+    if st.session_state.auto_save:
+        csv_bytes = df.to_csv(index=False).encode("utf-8")
+        with open(f"history/{tab}_最新.csv", "wb") as f:
+            f.write(csv_bytes)
 
-        csv_buffer = io.StringIO()
-        df.to_csv(csv_buffer, index=False)
-        csv_data = csv_buffer.getvalue().encode("utf-8")
+    csv_buffer = io.StringIO()
+    df.to_csv(csv_buffer, index=False)
+    csv_data = csv_buffer.getvalue()
 
-        st.download_button(
-            label="⬇️ 履歴ダウンロード",
-            data=csv_data,
-            file_name=f"{tab}_履歴.csv",
-            mime="text/csv"
-        )
-
+    st.download_button(
+        label="⬇️ 履歴ダウンロード",
+        data=csv_data,
+        file_name=f"{tab}_履歴.csv",
+        mime="text/csv"
+    )
     if tab + "_pool" in st.session_state and st.session_state[tab + "_pool"]:
         st.subheader("📈 年間指名回数の統計")
         counts = Counter(st.session_state[tab + "_pool"])
