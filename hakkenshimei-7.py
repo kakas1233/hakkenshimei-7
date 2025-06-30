@@ -1,82 +1,3 @@
-import streamlit as st
-import pandas as pd
-import os
-import random
-import math
-from collections import Counter
-from datetime import timedelta, timezone
-
-# タイムゾーン設定（必要なら）
-JST = timezone(timedelta(hours=9))
-
-# 履歴保存ディレクトリ
-os.makedirs("history", exist_ok=True)
-
-# 乱数生成法定義
-class Xorshift:
-    def __init__(self, seed):
-        self.state = seed if seed != 0 else 1
-    def next(self):
-        x = self.state
-        x ^= (x << 13) & 0xFFFFFFFF
-        x ^= (x >> 17)
-        x ^= (x << 5) & 0xFFFFFFFF
-        self.state = x & 0xFFFFFFFF
-        return self.state
-    def generate(self, count):
-        return [self.next() for _ in range(count)]
-
-def mersenne_twister(seed, count):
-    random.seed(seed)
-    return [random.randint(0, 100000) for _ in range(count)]
-
-def middle_square(seed, count):
-    n_digits = len(str(seed))
-    value = seed
-    result = []
-    for _ in range(count):
-        squared = value ** 2
-        squared_str = str(squared).zfill(2 * n_digits)
-        start = (len(squared_str) - n_digits) // 2
-        middle_digits = int(squared_str[start:start + n_digits])
-        result.append(middle_digits)
-        value = middle_digits if middle_digits != 0 else seed + 1
-    return result
-
-def lcg(seed, count):
-    m = 2**32; a = 1664525; c = 1013904223
-    result = []; x = seed
-    for _ in range(count):
-        x = (a * x + c) % m
-        result.append(x)
-    return result
-
-def calculate_variance(numbers, n):
-    mod = [x % n for x in numbers]
-    counts = Counter(mod)
-    all_counts = [counts.get(i, 0) for i in range(n)]
-    expected = len(numbers) / n
-    variance = sum((c - expected) ** 2 for c in all_counts) / n
-    return variance, mod
-
-@st.cache_data(show_spinner=False)
-def find_best_seed_and_method(k, l, n):
-    seed_range = range(0, 1000001, 100)
-    count = k * l
-    best = (float('inf'), None, None, None)
-    for method in ["Xorshift", "Mersenne Twister", "Middle Square", "LCG"]:
-        for seed in seed_range:
-            nums = {
-                "Xorshift": Xorshift(seed).generate(count),
-                "Mersenne Twister": mersenne_twister(seed, count),
-                "Middle Square": middle_square(seed, count),
-                "LCG": lcg(seed, count)
-            }[method]
-            var, modded = calculate_variance(nums, n)
-            if var < best[0]:
-                best = (var, method, seed, modded)
-    return best[1], best[2], best[0], best[3]
-
 def run_app():
     st.title("🎲 指名アプリ")
 
@@ -116,6 +37,48 @@ def run_app():
             st.session_state.class_list.append(new_class)
 
     tab = st.sidebar.selectbox("📚 クラス選択", st.session_state.class_list)
+
+    # --- 履歴読み込み部分を復活 ---
+    st.sidebar.markdown("### 📤 履歴の読み込み")
+    uploaded_csv = st.sidebar.file_uploader("CSV形式のファイルを選択", type="csv")
+    if uploaded_csv:
+        try:
+            df = pd.read_csv(uploaded_csv)
+            names_from_csv = df["名前"].tolist()
+            expected_n = int(df["n"].iloc[0])
+            if len(names_from_csv) < expected_n:
+                names_from_csv += [f"名前{i+1}" for i in range(len(names_from_csv), expected_n)]
+            elif len(names_from_csv) > expected_n:
+                names_from_csv = names_from_csv[:expected_n]
+
+            st.session_state[tab + "_names"] = names_from_csv
+            st.session_state[tab + "_name_input"] = "\n".join(names_from_csv)
+
+            if "指名済" in df.columns:
+                # 「指名済み」フラグTrueの生徒インデックスを取得
+                st.session_state[tab + "_used"] = [i for i, row in df.iterrows() if row["指名済"]]
+            else:
+                st.session_state[tab + "_used"] = []
+
+            st.session_state.sound_on = bool(df["音ON"].iloc[0])
+            st.session_state.auto_save = bool(df["自動保存ON"].iloc[0])
+            st.session_state[tab + "k"] = int(df["k"].iloc[0])
+            st.session_state[tab + "l"] = int(df["l"].iloc[0])
+            st.session_state[tab + "n"] = expected_n
+
+            # 最良乱数プール再生成
+            _, _, _, pool = find_best_seed_and_method(
+                st.session_state[tab + "k"],
+                st.session_state[tab + "l"],
+                st.session_state[tab + "n"]
+            )
+            st.session_state[tab + "_pool"] = pool
+
+            st.toast("✅ 履歴を読み込みました！")
+            st.experimental_rerun()
+
+        except Exception as e:
+            st.error(f"読み込みエラー: {e}")
 
     st.header(f"📋 {tab} の設定")
 
@@ -169,24 +132,26 @@ def run_app():
     if st.button("👆 指名する", key=tab + "_pick"):
         pool = st.session_state.get(tab + "_pool", [])
         used = st.session_state.get(tab + "_used", [])
-        remaining = [i for i in pool if i not in used and i in available]
+        # 変更ここ↓：指名済みは「名前番号」で管理し、pool内の名前番号を参照する形に修正
+        remaining = [idx for idx in available if idx not in used and idx in pool]
         if not remaining:
             st.warning("⚠️ 指名できる人がいません（全員指名済 or 欠席）")
         else:
-            sel = remaining[0]  # シャッフル済みの順に
+            sel = remaining[0]  # シャッフル済みのpool順は保持されないけどOK
             st.session_state[tab + "_used"].append(sel)
             st.markdown(
                 f"<div style='font-size:40px; text-align:center; color:green;'>🎉 {sel + 1}番: {names[sel]} 🎉</div>",
                 unsafe_allow_html=True
             )
 
-    # ★ 残り指名可能人数計算・表示部分 ★
+    # ★ 残り指名可能人数計算・表示部分（同様に「名前番号」管理に修正）
     pool = st.session_state.get(tab + "_pool", [])
     used = st.session_state.get(tab + "_used", [])
     absent_indexes = [i for i, name in enumerate(names) if name in absents]
     counts = Counter(pool)
     absent_count_in_pool = sum(counts.get(i, 0) for i in absent_indexes)
-    remaining_count = len(pool) - absent_count_in_pool - len(used)
+    # 指名済みは名前番号のリストなので、単純に
+    remaining_count = len(set(pool) - set(absent_indexes) - set(used))
     st.markdown(f"🔢 **残り指名可能人数: {remaining_count} 人**")
 
     df = pd.DataFrame([
@@ -234,6 +199,3 @@ def run_app():
         else:
             num = st.number_input("番号を入力", min_value=1, max_value=len(names), step=1, key=tab + "_stats_num")
             st.write(f"番号 {num} の {names[num-1]} さんは {count_list[num-1]} 回指名される見込みです。")
-
-if __name__ == "__main__":
-    run_app()
