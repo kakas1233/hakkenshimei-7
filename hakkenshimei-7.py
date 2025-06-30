@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import os
@@ -7,7 +6,7 @@ import math
 from collections import Counter
 from datetime import timedelta, timezone
 
-# タイムゾーン設定（必要なら）
+# タイムゾーン設定
 JST = timezone(timedelta(hours=9))
 
 # 履歴保存ディレクトリ
@@ -137,7 +136,6 @@ def run_app():
             if "指名済" in df.columns:
                 st.session_state[tab + "_used"] = [i for i, row in df.iterrows() if row["指名済"]]
             else:
-                # 古い形式（指名済列なし）の互換対応
                 st.session_state[tab + "_used"] = [int(row["番号"]) - 1 for _, row in df.iterrows()]
 
             # その他の設定を復元
@@ -147,7 +145,7 @@ def run_app():
             st.session_state[tab + "l"] = int(df["l"].iloc[0])
             st.session_state[tab + "n"] = expected_n
 
-            # プール再生成（復元には必要）
+            # プール再生成
             _, _, _, pool = find_best_seed_and_method(
                 st.session_state[tab + "k"],
                 st.session_state[tab + "l"],
@@ -171,7 +169,7 @@ def run_app():
         raw += [f"名前{i+1}" for i in range(len(raw), n)]
     elif len(raw) > n:
         raw = raw[:n]
-    names = [x.strip() for x in raw]
+    names = raw
     st.session_state[tab + "_names"] = names
     st.write("👥 メンバー:", [f"{i+1} : {name}" for i, name in enumerate(names)])
 
@@ -218,23 +216,23 @@ def run_app():
 
     used = st.session_state.get(tab + "_used", [])
     df = pd.DataFrame([
-    {
-        "番号": i + 1,
-        "名前": names[i],
-        "指名済": i in used,
-        "音ON": st.session_state.sound_on,
-        "自動保存ON": st.session_state.auto_save,
-        "クラス名": tab,
-        "k": k,
-        "l": l,
-        "n": n
-    }
-    for i in range(len(names))
-])
-#
+        {
+            "番号": i + 1,
+            "名前": names[i],
+            "指名済": i in used,
+            "音ON": st.session_state.sound_on,
+            "自動保存ON": st.session_state.auto_save,
+            "クラス名": tab,
+            "k": k,
+            "l": l,
+            "n": n
+        }
+        for i in range(len(names))
+    ])
+
     if len(df) > 0:
         st.subheader("📋 指名履歴")
-        st.dataframe(df[["番号", "名前"]])
+        st.dataframe(df[["番号", "名前", "指名済"]])
 
         if st.session_state.auto_save:
             df.to_csv(f"history/{tab}_最新.csv", index=False)
