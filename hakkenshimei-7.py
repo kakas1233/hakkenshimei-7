@@ -117,8 +117,8 @@ def run_app():
 
     tab = st.sidebar.selectbox("📚 クラス選択", st.session_state.class_list)
 
-    st.sidebar.markdown("### 📤 履歴CSVを手動で読み込み")
-    uploaded_csv = st.sidebar.file_uploader("CSVを選択", type="csv")
+    st.sidebar.markdown("### 📤 履歴の読み込み")
+    uploaded_csv = st.sidebar.file_uploader("CSV形式のファイルを選択", type="csv")
     if uploaded_csv:
         try:
             df = pd.read_csv(uploaded_csv)
@@ -150,7 +150,7 @@ def run_app():
             )
             st.session_state[tab + "_pool"] = pool
 
-            st.toast("✅ 手動で履歴CSVを読み込みました！")
+            st.toast("✅ 履歴を読み込みました！")
 
             st.experimental_rerun()  # ← これで画面を再実行して反映強制
 
@@ -246,10 +246,10 @@ def run_app():
         if st.session_state.auto_save:
             df.to_csv(f"history/{tab}_最新.csv", index=False)
 
-        st.download_button("⬇️ CSVダウンロード", df.to_csv(index=False), file_name=f"{tab}_履歴.csv")
+        st.download_button("⬇️ 履歴ダウンロード(必ずダウンロードしてからサイトを離れてください)", df.to_csv(index=False), file_name=f"{tab}_履歴.csv")
 
     if tab + "_pool" in st.session_state and st.session_state[tab + "_pool"]:
-        st.subheader("📈 指名回数の統計")
+        st.subheader("📈 年間指名回数の統計")
         counts = Counter(st.session_state[tab + "_pool"])
         count_list = [counts.get(i, 0) for i in range(len(names))]
         show_stats = st.selectbox("表示する統計を選択してください",
