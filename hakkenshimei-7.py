@@ -1,84 +1,75 @@
 import streamlit as st
 import pandas as pd
+import os
 import random
 import math
-import io
 from collections import Counter
+from datetime import timedelta, timezone
+import io
 
-def xorshift32(seed):
-    x = seed
-    def rnd():
-        nonlocal x
+JST = timezone(timedelta(hours=9))
+os.makedirs("history", exist_ok=True)
+
+class Xorshift:
+    def __init__(self, seed): self.state = seed if seed != 0 else 1
+    def next(self):
+        x = self.state
         x ^= (x << 13) & 0xFFFFFFFF
-        x ^= (x >> 17) & 0xFFFFFFFF
+        x ^= (x >> 17)
         x ^= (x << 5) & 0xFFFFFFFF
-        return x
-    return rnd
+        self.state = x & 0xFFFFFFFF
+        return self.state
+    def generate(self, count): return [self.next() for _ in range(count)]
 
-def mersenne_twister(seed):
+def mersenne_twister(seed, count):
     random.seed(seed)
-    def rnd():
-        return random.getrandbits(32)
-    return rnd
+    return [random.randint(0, 100000) for _ in range(count)]
 
-def square_middle(seed):
-    x = seed
-    def rnd():
-        nonlocal x
-        x = (x * x) // 100 % 1000000
-        return x
-    return rnd
+def middle_square(seed, count):
+    n_digits = len(str(seed))
+    value = seed; result = []
+    for _ in range(count):
+        squared = value ** 2
+        squared_str = str(squared).zfill(2 * n_digits)
+        start = (len(squared_str) - n_digits) // 2
+        middle_digits = int(squared_str[start:start + n_digits])
+        result.append(middle_digits)
+        value = middle_digits if middle_digits != 0 else seed + 1
+    return result
 
-def linear_congruential(seed):
-    a = 1103515245
-    c = 12345
-    m = 2**31
-    x = seed
-    def rnd():
-        nonlocal x
+def lcg(seed, count):
+    m = 2**32; a = 1664525; c = 1013904223
+    result = []; x = seed
+    for _ in range(count):
         x = (a * x + c) % m
-        return x
-    return rnd
+        result.append(x)
+    return result
 
-def generate_counts(method, seed, k, l, n):
-    # k: 年間授業回数、l: 1回あたり指名人数、n:クラス人数
-    total = k * l
-    rng = None
-    if method == "xorshift":
-        rng = xorshift32(seed)
-    elif method == "mersenne":
-        rng = mersenne_twister(seed)
-    elif method == "square":
-        rng = square_middle(seed)
-    elif method == "linear":
-        rng = linear_congruential(seed)
-    else:
-        raise ValueError("Unknown method")
+def calculate_variance(numbers, n):
+    mod = [x % n for x in numbers]
+    counts = Counter(mod)
+    all_counts = [counts.get(i, 0) for i in range(n)]
+    expected = len(numbers) / n
+    variance = sum((c - expected) ** 2 for c in all_counts) / n
+    return variance, mod
 
-    counts = [0] * n
-    for _ in range(total):
-        r = rng() % n
-        counts[r] += 1
-    variance = sum((c - total/n)**2 for c in counts)/n
-    return variance, counts
-
+@st.cache_data(show_spinner=False)
 def find_best_seed_and_method(k, l, n):
-    methods = ["xorshift", "mersenne", "square", "linear"]
-    best_var = float('inf')
-    best_seed = 1
-    best_method = "xorshift"
-    best_pool = []
-    for method in methods:
-        for seed in range(1, 6):
-            var, counts = generate_counts(method, seed, k, l, n)
-            if var < best_var:
-                best_var = var
-                best_seed = seed
-                best_method = method
-                best_pool = []
-                for i, c in enumerate(counts):
-                    best_pool.extend([i]*c)
-    return best_method, best_seed, best_var, best_pool
+    seed_range = range(0, 1000001, 100)
+    count = k * l
+    best = (float('inf'), None, None, None)
+    for method in ["Xorshift", "Mersenne Twister", "Middle Square", "LCG"]:
+        for seed in seed_range:
+            nums = {
+                "Xorshift": Xorshift(seed).generate(count),
+                "Mersenne Twister": mersenne_twister(seed, count),
+                "Middle Square": middle_square(seed, count),
+                "LCG": lcg(seed, count)
+            }[method]
+            var, modded = calculate_variance(nums, n)
+            if var < best[0]:
+                best = (var, method, seed, modded)
+    return best[1], best[2], best[0], best[3]
 
 def run_app():
     st.title("🎲 指名アプリ")
@@ -165,13 +156,13 @@ def run_app():
         with st.spinner("準備中です。少々お待ちください。"):
             method, seed, var, pool = find_best_seed_and_method(k, l, len(names))
             random.shuffle(pool)
+            std = math.sqrt(var)
+            exp = (k * l) / len(names)
             st.session_state[tab + "_pool"] = pool
             st.session_state[tab + "_used"] = []
             st.session_state[tab + "_method"] = method
             st.session_state[tab + "_seed"] = seed
             st.session_state[tab + "_var"] = var
-            std = math.sqrt(var)
-            exp = (k * l) / len(names)
             st.success(f"✅ 使用した式: {method}（seed={seed}、標準偏差={std:.2f}）")
             st.markdown(
                 f"<div style='font-size:20px;color:#1e90ff'>1人あたりの指名回数の範囲: 約 {exp - std:.2f} ～ {exp + std:.2f} 回</div>",
@@ -187,10 +178,8 @@ def run_app():
     if st.button("👆 指名する", key=tab + "_pick"):
         pool = st.session_state.get(tab + "_pool", [])
         used = st.session_state.get(tab + "_used", [])
-
         counts = Counter(pool)
         remaining = [i for i in pool if i in available and used.count(i) < counts[i]]
-
         if not remaining:
             st.warning("⚠️ 指名できる人がいません")
         else:
@@ -205,6 +194,27 @@ def run_app():
                 unsafe_allow_html=True
             )
 
+            # ✅ 指名直後の保存と通知
+            df = pd.DataFrame([
+                {
+                    "番号": i + 1,
+                    "名前": names[i],
+                    "指名済": i in st.session_state[tab + "_used"],
+                    "音ON": st.session_state.sound_on,
+                    "自動保存ON": st.session_state.auto_save,
+                    "クラス名": tab,
+                    "k": k,
+                    "l": l,
+                    "n": n
+                }
+                for i in range(len(names))
+            ])
+            if st.session_state.auto_save:
+                csv_bytes = df.to_csv(index=False).encode("utf-8")
+                with open(f"history/{tab}_最新.csv", "wb") as f:
+                    f.write(csv_bytes)
+                st.toast("💾 履歴を保存しました")
+
     pool = st.session_state.get(tab + "_pool", [])
     used = st.session_state.get(tab + "_used", [])
     counts = Counter(pool)
@@ -213,8 +223,6 @@ def run_app():
     used_count = len(used)
     remaining_count = len(pool) - absent_count_in_pool - used_count
     st.markdown(f"🔢 **残り指名可能人数: {remaining_count} 人**")
-
-    st.subheader("📋 指名履歴（指名された順）")
 
     df = pd.DataFrame([
         {
@@ -231,34 +239,28 @@ def run_app():
         for i in range(len(names))
     ])
 
-    if used:
+    if len(df) > 0:
+        st.subheader("📋 指名履歴（指名された順）")
         ordered_df = pd.DataFrame([
-            {"番号": idx + 1, "名前": names[idx]} for idx in used
+            {"番号": i + 1, "名前": names[i]} for i in used
         ])
         st.dataframe(ordered_df)
-    else:
-        st.info("まだ誰も指名されていません")
 
-    # 自動保存（ファイル書き込みは環境に合わせて適宜調整してください）
-    if st.session_state.auto_save:
-        csv_bytes = df.to_csv(index=False).encode("utf-8")
-        try:
+        if st.session_state.auto_save:
+            csv_bytes = df.to_csv(index=False).encode("utf-8")
             with open(f"history/{tab}_最新.csv", "wb") as f:
                 f.write(csv_bytes)
-        except Exception:
-            pass  # 書き込み権限のない環境ではスキップ
 
-    # 常に履歴ダウンロードボタン表示
-    csv_buffer = io.StringIO()
-    df.to_csv(csv_buffer, index=False)
-    csv_data = csv_buffer.getvalue().encode("utf-8")
+        csv_buffer = io.StringIO()
+        df.to_csv(csv_buffer, index=False)
+        csv_data = csv_buffer.getvalue().encode("utf-8")
 
-    st.download_button(
-        label="⬇️ 履歴ダウンロード",
-        data=csv_data,
-        file_name=f"{tab}_履歴.csv",
-        mime="text/csv"
-    )
+        st.download_button(
+            label="⬇️ 履歴ダウンロード",
+            data=csv_data,
+            file_name=f"{tab}_履歴.csv",
+            mime="text/csv"
+        )
 
     if tab + "_pool" in st.session_state and st.session_state[tab + "_pool"]:
         st.subheader("📈 年間指名回数の統計")
