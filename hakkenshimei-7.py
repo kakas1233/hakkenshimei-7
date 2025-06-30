@@ -186,7 +186,6 @@ def run_app():
             sel = random.choice(remaining)
             st.session_state[tab + "_used"].append(sel)
 
-            # 音再生をここで呼ぶ（mp3データがあれば）
             if st.session_state.sound_on and st.session_state.get("mp3_data"):
                 st.audio(st.session_state["mp3_data"], format="audio/mp3", start_time=0)
 
@@ -204,6 +203,9 @@ def run_app():
     remaining_count = len(pool) - absent_count_in_pool - used_count
     st.markdown(f"🔢 **残り指名可能人数: {remaining_count} 人**")
 
+    st.subheader("📋 指名履歴（指名された順）")
+
+    # ✅ 指名履歴全体（常に作成）
     df = pd.DataFrame([
         {
             "番号": i + 1,
@@ -219,23 +221,23 @@ def run_app():
         for i in range(len(names))
     ])
 
-    st.subheader("📋 指名履歴（指名された順）")
-    if len(used) > 0:
+    if used:
         ordered_df = pd.DataFrame([
             {"番号": i + 1, "名前": names[i]} for i in used
         ])
         st.dataframe(ordered_df)
     else:
-        st.info("📭 まだ指名履歴がありません。")
+        st.info("まだ誰も指名されていません")
 
     if st.session_state.auto_save:
         csv_bytes = df.to_csv(index=False).encode("utf-8")
         with open(f"history/{tab}_最新.csv", "wb") as f:
             f.write(csv_bytes)
 
+    # ✅ ダウンロードボタン（必ず出る）
     csv_buffer = io.StringIO()
     df.to_csv(csv_buffer, index=False)
-    csv_data = csv_buffer.getvalue()
+    csv_data = csv_buffer.getvalue().encode("utf-8")
 
     st.download_button(
         label="⬇️ 履歴ダウンロード",
@@ -243,6 +245,7 @@ def run_app():
         file_name=f"{tab}_履歴.csv",
         mime="text/csv"
     )
+
     if tab + "_pool" in st.session_state and st.session_state[tab + "_pool"]:
         st.subheader("📈 年間指名回数の統計")
         counts = Counter(st.session_state[tab + "_pool"])
