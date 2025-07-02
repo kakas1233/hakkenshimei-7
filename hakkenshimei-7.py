@@ -145,6 +145,17 @@ def run_app():
     l = st.number_input("授業1回あたりの平均指名人数", value=st.session_state.get(tab + "l", 5), min_value=1, key=tab + "l")
     n = st.number_input("クラス人数", value=st.session_state.get(tab + "n", 40), min_value=1, key=tab + "n")
 
+    name_csv = st.file_uploader("📄 名前CSVをアップロード（列名は「名前」）", type=["csv"], key=tab + "_name_csv")
+    if name_csv:
+        try:
+            df_name = pd.read_csv(name_csv)
+            if "名前" in df_name.columns:
+                st.session_state[tab + "_name_input"] = "\n".join(df_name["名前"].dropna().astype(str).tolist())
+                st.success("✅ 名前リストをCSVから読み込みました")
+            else:
+                st.warning("⚠️ CSVに「名前」列が見つかりません")
+    except Exception as e:
+        st.error(f"読み込み失敗: {e}")
     name_input = st.text_area("名前を改行区切りで入力（足りない分は自動補完）",
                               height=120,
                               key=tab + "_name_input",
