@@ -146,7 +146,7 @@ def run_app():
     n = st.number_input("クラス人数", value=st.session_state.get(tab + "n", 40), min_value=1, key=tab + "n")
 
     # ✅ 名前CSVアップロード機能（追加）
-    name_csv = st.file_uploader("📄 名前CSVをアップロード（列名は「名前」）", type=["csv"], key=tab + "_name_csv")
+    name_csv = st.file_uploader("📄 名前CSVをアップロード（一番上に「名前」と入力し、同じ列に名前を入力してください）", type=["csv"], key=tab + "_name_csv")
     if name_csv:
         try:
             df_name = pd.read_csv(name_csv)
