@@ -145,6 +145,7 @@ def run_app():
     l = st.number_input("授業1回あたりの平均指名人数", value=st.session_state.get(tab + "l", 5), min_value=1, key=tab + "l")
     n = st.number_input("クラス人数", value=st.session_state.get(tab + "n", 40), min_value=1, key=tab + "n")
 
+    # ✅ 名前CSVアップロード機能（追加）
     name_csv = st.file_uploader("📄 名前CSVをアップロード（列名は「名前」）", type=["csv"], key=tab + "_name_csv")
     if name_csv:
         try:
@@ -154,8 +155,9 @@ def run_app():
                 st.success("✅ 名前リストをCSVから読み込みました")
             else:
                 st.warning("⚠️ CSVに「名前」列が見つかりません")
-    except Exception as e:
-        st.error(f"読み込み失敗: {e}")
+        except Exception as e:
+            st.error(f"読み込み失敗: {e}")
+
     name_input = st.text_area("名前を改行区切りで入力（足りない分は自動補完）",
                               height=120,
                               key=tab + "_name_input",
@@ -210,7 +212,7 @@ def run_app():
 
             if st.session_state.sound_on and st.session_state.get("mp3_data"):
                 b64_mp3 = base64.b64encode(st.session_state["mp3_data"]).decode()
-                unique_id = uuid.uuid4()  # ランダムIDで毎回違うタグに
+                unique_id = uuid.uuid4()
                 audio_html = f"""
                     <audio autoplay key="{unique_id}">
                         <source src="data:audio/mp3;base64,{b64_mp3}" type="audio/mp3">
